@@ -1,7 +1,6 @@
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
-const { sendWelcomeEmail, sendLoginAlertEmail } = require('../utils/emailService');
 
 const generateToken = (id) => {
   return jwt.sign(
@@ -66,13 +65,6 @@ const register = async (req, res) => {
 
     const token = generateToken(user._id);
 
-    // Asynchronously send welcome email (non-blocking)
-    sendWelcomeEmail({
-      _id: user._id,
-      name: user.name,
-      email: user.email,
-    }).catch((err) => console.error('Background welcome email error:', err.message));
-
     return res.status(201).json({
       success: true,
       data: {
@@ -121,23 +113,6 @@ const login = async (req, res) => {
     }
 
     const token = generateToken(user._id);
-
-    // Asynchronously send login alert email (non-blocking)
-    const clientIp = req.headers['x-forwarded-for'] || req.socket.remoteAddress || req.ip;
-    const userAgent = req.headers['user-agent'] || 'Web Browser';
-    
-    sendLoginAlertEmail(
-      {
-        _id: user._id,
-        name: user.name,
-        email: user.email,
-      },
-      {
-        ip: clientIp,
-        userAgent: userAgent,
-        time: new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }),
-      }
-    ).catch((err) => console.error('Background login alert email error:', err.message));
 
     return res.status(200).json({
       success: true,
