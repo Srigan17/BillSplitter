@@ -20,3 +20,8 @@ Thumbs.db
 # IDE & Editor files
 .vscode/
 .idea/
+
+# Database files
+*.db
+billsplitter.db
+
