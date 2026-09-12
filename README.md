@@ -142,25 +142,7 @@ npm install
 
 ---
 
-## 🎈 Deploying with Streamlit Cloud
 
-The repository includes a ready-to-deploy Python Streamlit application ([`app.py`](app.py) / [`streamlit_app.py`](streamlit_app.py)) with Plotly interactive charts and self-initializing persistent storage.
-
-### 1. Deploy to Streamlit Community Cloud (1-Click)
-1. Go to **[share.streamlit.io](https://share.streamlit.io/)** and sign in with your GitHub account.
-2. Click **"New app"**.
-3. Select this repository: `Srigan17/BillSplitter`.
-4. Branch: `main`.
-5. Main file path: `app.py` (or `streamlit_app.py`).
-6. Click **"Deploy!"** 🚀
-
-### 2. Run Streamlit Locally
-```bash
-pip install -r requirements.txt
-streamlit run app.py
-```
-
----
 
 ## 🚦 Running the Full-Stack Node.js Application
 
