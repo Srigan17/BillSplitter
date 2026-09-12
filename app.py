@@ -1,37 +1,24 @@
 import streamlit as st
 import pandas as pd
-import plotly.express as px
 import sqlite3
 import hashlib
 import json
 from datetime import datetime
 
-# Set page configuration
+# Try importing plotly; fallback gracefully if not installed
+try:
+    import plotly.express as px
+    HAS_PLOTLY = True
+except ImportError:
+    HAS_PLOTLY = False
+
+# Set page configuration - must be the first Streamlit command
 st.set_page_config(
     page_title="Bill Splitter",
     page_icon="⚖️",
     layout="wide",
     initial_sidebar_state="expanded",
 )
-
-# Custom CSS for modern styling
-st.markdown("""
-<style>
-    .metric-box {
-        background-color: #f8fafc;
-        border: 1px solid #e2e8f0;
-        border-radius: 12px;
-        padding: 18px;
-        border-left: 5px solid #6366f1;
-        box-shadow: 0 1px 3px rgba(0,0,0,0.05);
-    }
-    .metric-label { font-size: 0.85rem; font-weight: 600; color: #64748b; text-transform: uppercase; }
-    .metric-val { font-size: 1.75rem; font-weight: 800; color: #1e293b; margin: 4px 0; }
-    .badge-receive { background-color: #d1fae5; color: #065f46; padding: 4px 10px; border-radius: 9999px; font-weight: 700; font-size: 0.8rem; }
-    .badge-pay { background-color: #fee2e2; color: #991b1b; padding: 4px 10px; border-radius: 9999px; font-weight: 700; font-size: 0.8rem; }
-    .badge-settled { background-color: #e0e7ff; color: #3730a3; padding: 4px 10px; border-radius: 9999px; font-weight: 700; font-size: 0.8rem; }
-</style>
-""", unsafe_allow_html=True)
 
 # ----------------- DATABASE UTILITIES (SQLite) -----------------
 DB_FILE = "billsplitter.db"
@@ -44,7 +31,6 @@ def get_db():
 def init_db():
     with get_db() as conn:
         cursor = conn.cursor()
-        # Users Table
         cursor.execute("""
         CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -54,7 +40,6 @@ def init_db():
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
         """)
-        # Groups Table
         cursor.execute("""
         CREATE TABLE IF NOT EXISTS groups (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -64,7 +49,6 @@ def init_db():
             FOREIGN KEY (created_by) REFERENCES users(id)
         )
         """)
-        # Group Members Table
         cursor.execute("""
         CREATE TABLE IF NOT EXISTS group_members (
             group_id INTEGER,
@@ -74,7 +58,6 @@ def init_db():
             FOREIGN KEY (user_id) REFERENCES users(id)
         )
         """)
-        # Expenses Table
         cursor.execute("""
         CREATE TABLE IF NOT EXISTS expenses (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -83,8 +66,8 @@ def init_db():
             amount REAL NOT NULL,
             category TEXT NOT NULL,
             date TEXT NOT NULL,
-            payments TEXT NOT NULL, -- JSON: [{"userId": 1, "amount": 500}]
-            splits TEXT NOT NULL,   -- JSON: [{"userId": 1, "amount": 250, "percentage": 50}]
+            payments TEXT NOT NULL,
+            splits TEXT NOT NULL,
             split_method TEXT NOT NULL,
             created_by INTEGER,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -92,7 +75,6 @@ def init_db():
             FOREIGN KEY (created_by) REFERENCES users(id)
         )
         """)
-        # Settlements Table
         cursor.execute("""
         CREATE TABLE IF NOT EXISTS settlements (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -150,7 +132,6 @@ def round2(val):
 def calculate_group_finances(group_id, current_user_id):
     with get_db() as conn:
         cursor = conn.cursor()
-        # Fetch members
         cursor.execute("""
         SELECT u.id, u.name, u.email 
         FROM users u 
@@ -172,11 +153,9 @@ def calculate_group_finances(group_id, current_user_id):
             for m in members
         }
 
-        # Fetch expenses
         cursor.execute("SELECT * FROM expenses WHERE group_id = ? ORDER BY date DESC", (group_id,))
         expenses = [dict(row) for row in cursor.fetchall()]
 
-        # Fetch settlements
         cursor.execute("SELECT * FROM settlements WHERE group_id = ? AND status = 'settled' ORDER BY settled_at DESC", (group_id,))
         settlements = [dict(row) for row in cursor.fetchall()]
 
@@ -219,7 +198,6 @@ def calculate_group_finances(group_id, current_user_id):
             if uid in member_map:
                 member_map[uid]["owed"] = round2(member_map[uid]["owed"] + s_amt)
 
-        # Pairwise attribution
         if amt > 0:
             for s in splits:
                 debtor_id = s["userId"]
@@ -244,21 +222,18 @@ def calculate_group_finances(group_id, current_user_id):
                                     "amountOwed": portion_owed,
                                 })
 
-    # Account for settled settlements
-    for st in settlements:
-        f_id = st["from_user"]
-        t_id = st["to_user"]
-        s_amt = st["amount"]
+    for st_rec in settlements:
+        f_id = st_rec["from_user"]
+        t_id = st_rec["to_user"]
+        s_amt = st_rec["amount"]
         if f_id in member_map:
             member_map[f_id]["settled_paid"] = round2(member_map[f_id]["settled_paid"] + s_amt)
         if t_id in member_map:
             member_map[t_id]["settled_received"] = round2(member_map[t_id]["settled_received"] + s_amt)
 
-    # Net balances
     for m in member_map.values():
         m["net_balance"] = round2((m["paid"] - m["owed"]) + (m["settled_paid"] - m["settled_received"]))
 
-    # Greedy Settlement Optimization
     creditors = [
         {"userId": m["id"], "name": m["name"], "balance": m["net_balance"]}
         for m in member_map.values() if m["net_balance"] > 0.01
@@ -294,7 +269,6 @@ def calculate_group_finances(group_id, current_user_id):
         if d["balance"] < 0.01:
             debtors.pop(0)
 
-    # Tailored lists for current user
     you_need_to_pay = []
     if current_user_id in pairwise_debts:
         for target_id, debt_info in pairwise_debts[current_user_id].items():
@@ -338,55 +312,55 @@ if "active_group_id" not in st.session_state:
 
 # ----------------- AUTHENTICATION VIEW -----------------
 if not st.session_state.user:
-    st.markdown("<h1 style='text-align: center;'>⚖️ Bill Splitter</h1>", unsafe_allow_html=True)
-    st.markdown("<p style='text-align: center; color: #64748b;'>Effortless group expense splitting & optimized debt settlements</p>", unsafe_allow_html=True)
+    st.title("⚖️ Bill Splitter")
+    st.caption("Effortless group expense splitting & optimized debt settlements")
 
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
-        tab_login, tab_register = st.tabs(["🔐 Log In", "📝 Sign Up"])
+        with st.container(border=True):
+            tab_login, tab_register = st.tabs(["🔐 Log In", "📝 Sign Up"])
 
-        with tab_login:
-            st.subheader("Login to your account")
-            login_email = st.text_input("Email Address", key="login_email")
-            login_password = st.text_input("Password", type="password", key="login_password")
-            if st.button("Log In", type="primary", use_container_width=True):
-                if not login_email or not login_password:
-                    st.error("Please provide both email and password.")
-                else:
-                    success, res = login_user(login_email, login_password)
-                    if success:
-                        st.session_state.user = res
-                        st.rerun()
+            with tab_login:
+                st.subheader("Login to your account")
+                login_email = st.text_input("Email Address", key="login_email")
+                login_password = st.text_input("Password", type="password", key="login_password")
+                if st.button("Log In", type="primary", use_container_width=True):
+                    if not login_email or not login_password:
+                        st.error("Please provide both email and password.")
                     else:
-                        st.error(res)
+                        success, res = login_user(login_email, login_password)
+                        if success:
+                            st.session_state.user = res
+                            st.rerun()
+                        else:
+                            st.error(res)
 
-        with tab_register:
-            st.subheader("Create a new account")
-            reg_name = st.text_input("Full Name", key="reg_name")
-            reg_email = st.text_input("Email Address", key="reg_email")
-            reg_password = st.text_input("Password (min 6 characters)", type="password", key="reg_password")
-            reg_confirm = st.text_input("Confirm Password", type="password", key="reg_confirm")
-            if st.button("Create Account", type="primary", use_container_width=True):
-                if not reg_name or not reg_email or not reg_password:
-                    st.error("Please fill in all fields.")
-                elif reg_password != reg_confirm:
-                    st.error("Passwords do not match.")
-                elif len(reg_password) < 6:
-                    st.error("Password must be at least 6 characters.")
-                else:
-                    success, res = register_user(reg_name, reg_email, reg_password)
-                    if success:
-                        st.success("Account created successfully! Logging you in...")
-                        st.session_state.user = res
-                        st.rerun()
+            with tab_register:
+                st.subheader("Create a new account")
+                reg_name = st.text_input("Full Name", key="reg_name")
+                reg_email = st.text_input("Email Address", key="reg_email")
+                reg_password = st.text_input("Password (min 6 characters)", type="password", key="reg_password")
+                reg_confirm = st.text_input("Confirm Password", type="password", key="reg_confirm")
+                if st.button("Create Account", type="primary", use_container_width=True):
+                    if not reg_name or not reg_email or not reg_password:
+                        st.error("Please fill in all fields.")
+                    elif reg_password != reg_confirm:
+                        st.error("Passwords do not match.")
+                    elif len(reg_password) < 6:
+                        st.error("Password must be at least 6 characters.")
                     else:
-                        st.error(res)
+                        success, res = register_user(reg_name, reg_email, reg_password)
+                        if success:
+                            st.success("Account created successfully! Logging you in...")
+                            st.session_state.user = res
+                            st.rerun()
+                        else:
+                            st.error(res)
 
 # ----------------- MAIN LOGGED-IN DASHBOARD -----------------
 else:
     current_user = st.session_state.user
 
-    # Fetch user's groups
     with get_db() as conn:
         cursor = conn.cursor()
         cursor.execute("""
@@ -398,7 +372,6 @@ else:
         """, (current_user["id"],))
         user_groups = [dict(row) for row in cursor.fetchall()]
 
-    # Sidebar
     with st.sidebar:
         st.markdown(f"### 👋 Hi, {current_user['name']}")
         st.caption(current_user["email"])
@@ -425,7 +398,6 @@ else:
         else:
             st.info("You are not part of any group yet.")
 
-        # Create Group Dialog / Form
         with st.expander("➕ Create New Group"):
             new_gname = st.text_input("Group Name", placeholder="e.g. Goa Trip, Roommates")
             if st.button("Create Group", type="primary", use_container_width=True):
@@ -442,22 +414,19 @@ else:
                 else:
                     st.error("Please enter a group name.")
 
-    # Main Body
     if not st.session_state.active_group_id:
         st.info("👈 Create or select a group from the sidebar to start tracking expenses.")
     else:
         active_gid = st.session_state.active_group_id
         finances = calculate_group_finances(active_gid, current_user["id"])
 
-        # Group Title & Banner
         with get_db() as conn:
             cursor = conn.cursor()
             cursor.execute("SELECT name FROM groups WHERE id = ?", (active_gid,))
             group_name = cursor.fetchone()["name"]
 
-        st.markdown(f"# ⚖️ {group_name}")
+        st.markdown(f"## ⚖️ {group_name}")
         
-        # Members List & Add Member
         col_m1, col_m2 = st.columns([3, 1])
         with col_m1:
             member_names = [f"{m['name']} {'(You)' if m['id'] == current_user['id'] else ''}" for m in finances["members"]]
@@ -483,7 +452,6 @@ else:
                                     st.success(f"Added {found_user['name']} to group!")
                                     st.rerun()
 
-        # 4 Top Metrics Cards
         curr_member_stat = next((m for m in finances["members"] if m["id"] == current_user["id"]), None)
         user_paid = curr_member_stat["paid"] if curr_member_stat else 0.0
         user_owed = curr_member_stat["owed"] if curr_member_stat else 0.0
@@ -491,48 +459,19 @@ else:
 
         m1, m2, m3, m4 = st.columns(4)
         with m1:
-            st.markdown(f"""
-            <div class="metric-box">
-                <div class="metric-label">Total Group Spending</div>
-                <div class="metric-val">₹{finances['totalGroupSpending']:,.2f}</div>
-                <small style="color: #64748b;">All expenses combined</small>
-            </div>
-            """, unsafe_allow_html=True)
+            st.metric(label="Total Group Spending", value=f"₹{finances['totalGroupSpending']:,.2f}")
         with m2:
-            st.markdown(f"""
-            <div class="metric-box">
-                <div class="metric-label">You Paid (Spent)</div>
-                <div class="metric-val">₹{user_paid:,.2f}</div>
-                <small style="color: #64748b;">Paid by you upfront</small>
-            </div>
-            """, unsafe_allow_html=True)
+            st.metric(label="You Paid (Spent)", value=f"₹{user_paid:,.2f}")
         with m3:
-            st.markdown(f"""
-            <div class="metric-box">
-                <div class="metric-label">Your Fair Share</div>
-                <div class="metric-val">₹{user_owed:,.2f}</div>
-                <small style="color: #64748b;">Your total share owed</small>
-            </div>
-            """, unsafe_allow_html=True)
+            st.metric(label="Your Fair Share", value=f"₹{user_owed:,.2f}")
         with m4:
             if net_bal > 0.01:
-                badge = f'<span class="badge-receive">You Receive ₹{net_bal:,.2f}</span>'
+                st.metric(label="Your Net Balance", value=f"₹{net_bal:,.2f}", delta="You Receive")
             elif net_bal < -0.01:
-                badge = f'<span class="badge-pay">You Owe ₹{abs(net_bal):,.2f}</span>'
+                st.metric(label="Your Net Balance", value=f"₹{abs(net_bal):,.2f}", delta="-You Owe", delta_color="inverse")
             else:
-                badge = '<span class="badge-settled">All Settled (₹0.00)</span>'
+                st.metric(label="Your Net Balance", value="₹0.00", delta="All Settled", delta_color="off")
 
-            st.markdown(f"""
-            <div class="metric-box">
-                <div class="metric-label">Your Net Balance</div>
-                <div class="metric-val">₹{abs(net_bal):,.2f}</div>
-                <div>{badge}</div>
-            </div>
-            """, unsafe_allow_html=True)
-
-        st.markdown("<br>", unsafe_allow_html=True)
-
-        # Tabs for Dashboard Sections
         tab_debts, tab_add_exp, tab_expenses, tab_analytics, tab_history = st.tabs([
             "⚡ Balances & Settlements",
             "💳 + Add Expense",
@@ -541,7 +480,6 @@ else:
             "📜 Settlement History",
         ])
 
-        # TAB 1: Balances & Settlements
         with tab_debts:
             col_l, col_r = st.columns(2)
 
@@ -595,7 +533,6 @@ else:
                                 st.success(f"Settlement of ₹{st_item['amount']:,.2f} recorded!")
                                 st.rerun()
 
-        # TAB 2: Add Expense
         with tab_add_exp:
             st.markdown("### Add a New Group Expense")
             with st.form("add_expense_form", clear_on_submit=True):
@@ -689,7 +626,6 @@ else:
                             st.success(f"Expense '{exp_title}' recorded!")
                             st.rerun()
 
-        # TAB 3: Expenses List
         with tab_expenses:
             st.markdown("### Group Expense History")
             if not finances["expenses"]:
@@ -716,7 +652,6 @@ else:
                             st.success("Expense deleted.")
                             st.rerun()
 
-        # TAB 4: Analytics
         with tab_analytics:
             st.markdown("### Category Spending Breakdown")
             c_chart1, c_chart2 = st.columns(2)
@@ -728,9 +663,11 @@ else:
             with c_chart1:
                 st.markdown("#### 🏢 Group Spending by Category")
                 if not group_cat_df.empty:
-                    fig = px.pie(group_cat_df, values="Amount", names="Category", hole=0.5, color_discrete_sequence=px.colors.qualitative.Pastel)
-                    fig.update_layout(margin=dict(t=10, b=10, l=10, r=10))
-                    st.plotly_chart(fig, use_container_width=True)
+                    if HAS_PLOTLY:
+                        fig = px.pie(group_cat_df, values="Amount", names="Category", hole=0.5)
+                        st.plotly_chart(fig, use_container_width=True)
+                    else:
+                        st.bar_chart(group_cat_df.set_index("Category"))
                 else:
                     st.info("No spending recorded.")
 
@@ -740,13 +677,14 @@ else:
                     [{"Category": k, "Amount": v} for k, v in finances["userCategorySpending"].items() if v > 0]
                 )
                 if not user_cat_df.empty:
-                    fig_user = px.pie(user_cat_df, values="Amount", names="Category", hole=0.5, color_discrete_sequence=px.colors.qualitative.Safe)
-                    fig_user.update_layout(margin=dict(t=10, b=10, l=10, r=10))
-                    st.plotly_chart(fig_user, use_container_width=True)
+                    if HAS_PLOTLY:
+                        fig_user = px.pie(user_cat_df, values="Amount", names="Category", hole=0.5)
+                        st.plotly_chart(fig_user, use_container_width=True)
+                    else:
+                        st.bar_chart(user_cat_df.set_index("Category"))
                 else:
                     st.info("You haven't paid upfront for any expenses in this group yet.")
 
-        # TAB 5: Settlement History
         with tab_history:
             st.markdown("### Completed Settlements")
             if not finances["settlements"]:
