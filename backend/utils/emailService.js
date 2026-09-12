@@ -10,11 +10,11 @@ let transporter = null;
 const getTransporter = async () => {
   if (transporter) return transporter;
 
-  const host = process.env.SMTP_HOST;
-  const user = process.env.SMTP_USER;
+  const host = process.env.SMTP_HOST || 'smtp.gmail.com';
+  const user = process.env.SMTP_USER || 'owelessapp@gmail.com';
   const pass = process.env.SMTP_PASS;
 
-  if (host && user && pass) {
+  if (pass) {
     transporter = nodemailer.createTransport({
       host: host,
       port: Number(process.env.SMTP_PORT) || 587,
@@ -24,15 +24,15 @@ const getTransporter = async () => {
         pass: pass,
       },
     });
-    console.log(`📧 SMTP Transporter initialized with host: ${host}`);
+    console.log(`📧 SMTP Transporter initialized with host: ${host} for user: ${user}`);
   } else {
-    // In development without SMTP credentials, use a fallback transport that logs to console
-    console.log('ℹ️ No SMTP credentials provided in .env. Using fallback mail logger.');
+    // In development or when SMTP_PASS is not provided, use a fallback transport that logs to console
+    console.log('ℹ️ No SMTP_PASS provided in .env. Using fallback mail logger.');
     transporter = {
       sendMail: async (mailOptions) => {
         console.log('\n================== 📧 EMAIL NOTIFICATION DISPATCHED ==================');
         console.log(`To: ${mailOptions.to}`);
-        console.log(`From: ${mailOptions.from || process.env.EMAIL_FROM || 'noreply@billsplitter.com'}`);
+        console.log(`From: ${mailOptions.from || process.env.EMAIL_FROM || '"Oweless" <owelessapp@gmail.com>'}`);
         console.log(`Subject: ${mailOptions.subject}`);
         console.log('--------------------------- Content Preview ---------------------------');
         console.log(mailOptions.text || mailOptions.html.replace(/<[^>]*>?/gm, ' ').slice(0, 300) + '...');
@@ -52,7 +52,7 @@ const getTransporter = async () => {
 const sendWelcomeEmail = async (user) => {
   try {
     const mailer = await getTransporter();
-    const fromAddress = process.env.EMAIL_FROM || '"Bill Splitter" <noreply@billsplitter.com>';
+    const fromAddress = process.env.EMAIL_FROM || '"Oweless" <owelessapp@gmail.com>';
 
     const htmlContent = `
       <!DOCTYPE html>
@@ -76,7 +76,7 @@ const sendWelcomeEmail = async (user) => {
       <body>
         <div class="container">
           <div class="header">
-            <h1>⚖️ Welcome to Bill Splitter</h1>
+            <h1>⚖️ Welcome to Oweless</h1>
             <p>Fair, transparent, and hassle-free expense sharing</p>
           </div>
           <div class="body">
@@ -88,18 +88,18 @@ const sendWelcomeEmail = async (user) => {
               <strong>Account Created:</strong> ${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}
             </div>
 
-            <h3>What you can do with Bill Splitter:</h3>
+            <h3>What you can do with Oweless:</h3>
             <ul class="features-list">
               <li><span>👥</span> <strong>Create Groups:</strong> Organize trips, flats, dinners, and events.</li>
               <li><span>💳</span> <strong>Flexible Splitting:</strong> Split equally, by percentages, or exact amounts with single or multiple payers.</li>
-              <li><span>⚡</span> <strong>Minimised Settlements:</strong> Let our algorithm reduce 10 debt transfers down to just 2 or 3 payments.</li>
+              <li><span>⚡</span> <strong>Minimised Settlements:</strong> Let our algorithm reduce debt transfers down to the fewest payments.</li>
               <li><span>🔍</span> <strong>Itemized Audit Trails:</strong> Trace every rupee back to the original bill so there's never any confusion.</li>
             </ul>
 
             <p style="margin-top: 25px;">Log in to your dashboard anytime to get started!</p>
           </div>
           <div class="footer">
-            <p>This is an automated notification from Bill Splitter. Please do not reply directly to this email.</p>
+            <p>This is an automated notification from Oweless (owelessapp@gmail.com). Please do not reply directly to this email.</p>
           </div>
         </div>
       </body>
@@ -109,8 +109,8 @@ const sendWelcomeEmail = async (user) => {
     const mailOptions = {
       from: fromAddress,
       to: user.email,
-      subject: `Welcome to Bill Splitter, ${user.name}! ⚖️`,
-      text: `Hello ${user.name},\n\nYour Bill Splitter account has been successfully created with email ${user.email}.\n\nWelcome aboard!\nBill Splitter Team`,
+      subject: `Welcome to Oweless, ${user.name}! ⚖️`,
+      text: `Hello ${user.name},\n\nYour Oweless account has been successfully created with email ${user.email}.\n\nWelcome aboard!\nOweless Team\nowelessapp@gmail.com`,
       html: htmlContent,
     };
 
@@ -130,7 +130,7 @@ const sendWelcomeEmail = async (user) => {
 const sendLoginAlertEmail = async (user, details = {}) => {
   try {
     const mailer = await getTransporter();
-    const fromAddress = process.env.EMAIL_FROM || '"Bill Splitter" <noreply@billsplitter.com>';
+    const fromAddress = process.env.EMAIL_FROM || '"Oweless" <owelessapp@gmail.com>';
 
     const loginTime = details.time || new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' });
     const ipAddress = details.ip || 'Unknown IP';
@@ -163,7 +163,7 @@ const sendLoginAlertEmail = async (user, details = {}) => {
           </div>
           <div class="body">
             <h2>Hi ${user.name},</h2>
-            <p>You have successfully logged into your <strong>Bill Splitter</strong> account.</p>
+            <p>You have successfully logged into your <strong>Oweless</strong> account.</p>
             
             <div class="alert-box">
               <div class="alert-row">
@@ -189,7 +189,7 @@ const sendLoginAlertEmail = async (user, details = {}) => {
             </div>
           </div>
           <div class="footer">
-            <p>This is a security notification sent to ${user.email} for your Bill Splitter account.</p>
+            <p>This is a security notification sent to ${user.email} for your Oweless account (owelessapp@gmail.com).</p>
           </div>
         </div>
       </body>
@@ -199,8 +199,8 @@ const sendLoginAlertEmail = async (user, details = {}) => {
     const mailOptions = {
       from: fromAddress,
       to: user.email,
-      subject: `Security Alert: Successful Login to Bill Splitter`,
-      text: `Hello ${user.name},\n\nYou have successfully logged into your Bill Splitter account on ${loginTime} (IP: ${ipAddress}).\n\nIf this was not you, please secure your account immediately.\n\nBill Splitter Team`,
+      subject: `Security Alert: Successful Login to Oweless`,
+      text: `Hello ${user.name},\n\nYou have successfully logged into your Oweless account on ${loginTime} (IP: ${ipAddress}).\n\nIf this was not you, please secure your account immediately.\n\nOweless Team\nowelessapp@gmail.com`,
       html: htmlContent,
     };
 

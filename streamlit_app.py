@@ -3,6 +3,10 @@ import pandas as pd
 import sqlite3
 import hashlib
 import json
+import os
+import smtplib
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
 from datetime import datetime
 
 # Try importing plotly; fallback gracefully if not installed
@@ -14,7 +18,7 @@ except ImportError:
 
 # Set page configuration - must be the first Streamlit command
 st.set_page_config(
-    page_title="Bill Splitter",
+    page_title="Oweless — Smart Expense Sharing",
     page_icon="⚖️",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -222,6 +226,133 @@ init_db()
 def hash_password(password: str) -> str:
     return hashlib.sha256(password.encode()).hexdigest()
 
+def send_welcome_email_py(name: str, to_email: str):
+    """
+    Sends a welcome email from owelessapp@gmail.com to the user upon account creation.
+    Supports credentials via Streamlit Secrets (st.secrets) or environment variables.
+    Falls back gracefully to console logging if SMTP_PASS is omitted.
+    """
+    from email.header import Header
+
+    smtp_pass = None
+    try:
+        if hasattr(st, "secrets") and "SMTP_PASS" in st.secrets:
+            smtp_pass = st.secrets["SMTP_PASS"]
+    except Exception:
+        pass
+    if not smtp_pass:
+        smtp_pass = os.environ.get("SMTP_PASS")
+
+    smtp_user = "owelessapp@gmail.com"
+    try:
+        if hasattr(st, "secrets") and "SMTP_USER" in st.secrets:
+            smtp_user = st.secrets["SMTP_USER"]
+    except Exception:
+        pass
+    if os.environ.get("SMTP_USER"):
+        smtp_user = os.environ.get("SMTP_USER")
+
+    smtp_host = os.environ.get("SMTP_HOST", "smtp.gmail.com")
+    smtp_port = int(os.environ.get("SMTP_PORT", 587))
+    sender_name = "Oweless"
+    sender_email = smtp_user or "owelessapp@gmail.com"
+
+    subject_text = f"Welcome to Oweless, {name}! ⚖️"
+    now_str = datetime.now().strftime("%d %b %Y, %I:%M %p")
+
+    text_body = f"""Hello {name},
+
+Your Oweless account has been successfully created with email {to_email}.
+
+Welcome aboard!
+Oweless Team
+owelessapp@gmail.com
+"""
+
+    html_body = f"""<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    body {{ font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f8fafc; color: #1e293b; margin: 0; padding: 0; }}
+    .container {{ max-width: 600px; margin: 20px auto; background: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); border: 1px solid #e2e8f0; }}
+    .header {{ background: linear-gradient(135deg, #4f46e5 0%, #6366f1 100%); color: #ffffff; padding: 30px 20px; text-align: center; }}
+    .header h1 {{ margin: 0; font-size: 24px; font-weight: 700; }}
+    .header p {{ margin: 8px 0 0 0; opacity: 0.9; font-size: 14px; }}
+    .body {{ padding: 30px 25px; line-height: 1.6; }}
+    .welcome-box {{ background: #e0e7ff; border-left: 4px solid #6366f1; padding: 15px; border-radius: 6px; margin: 20px 0; color: #3730a3; }}
+    .features-list {{ list-style: none; padding: 0; margin: 20px 0; }}
+    .features-list li {{ padding: 8px 0; display: flex; align-items: center; }}
+    .features-list li span {{ margin-right: 10px; font-size: 18px; }}
+    .footer {{ background: #f1f5f9; padding: 20px; text-align: center; font-size: 12px; color: #64748b; border-top: 1px solid #e2e8f0; }}
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>⚖️ Welcome to Oweless</h1>
+      <p>Fair, transparent, and hassle-free expense sharing</p>
+    </div>
+    <div class="body">
+      <h2>Hello, {name}! 👋</h2>
+      <p>Your account has been successfully created. You're all set to start tracking shared expenses, finding optimal settlements, and keeping accounts clear with your friends, roommates, and colleagues.</p>
+      
+      <div class="welcome-box">
+        <strong>Registered Email:</strong> {to_email}<br>
+        <strong>Account Created:</strong> {now_str}
+      </div>
+
+      <h3>What you can do with Oweless:</h3>
+      <ul class="features-list">
+        <li><span>👥</span> <strong>Create Groups:</strong> Organize trips, flats, dinners, and events.</li>
+        <li><span>💳</span> <strong>Flexible Splitting:</strong> Split equally, by percentages, or exact amounts with single or multiple payers.</li>
+        <li><span>⚡</span> <strong>Minimised Settlements:</strong> Let our algorithm reduce debt transfers down to the fewest payments.</li>
+        <li><span>🔍</span> <strong>Itemized Audit Trails:</strong> Trace every rupee back to the original bill so there's never any confusion.</li>
+      </ul>
+
+      <p style="margin-top: 25px;">Log in to your dashboard anytime to get started!</p>
+    </div>
+    <div class="footer">
+      <p>This is an automated notification from Oweless (owelessapp@gmail.com). Please do not reply directly to this email.</p>
+    </div>
+  </div>
+</body>
+</html>"""
+
+    if not smtp_pass:
+        try:
+            print("\n================== EMAIL NOTIFICATION DISPATCHED ==================")
+            print(f"To: {to_email}")
+            print(f"From: {sender_name} <{sender_email}>")
+            print(f"Subject: Welcome to Oweless, {name}!")
+            print("--------------------------- Content Preview ---------------------------")
+            print(f"Hello {name},\n\nYour Oweless account has been successfully created with email {to_email}.\n\nWelcome aboard!\nOweless Team\nowelessapp@gmail.com")
+            print("======================================================================\n")
+        except Exception:
+            pass
+        return False, "SMTP_PASS not configured (Logged to console)"
+
+    try:
+        msg = MIMEMultipart("alternative")
+        msg["Subject"] = Header(subject_text, "utf-8").encode()
+        msg["From"] = f"{sender_name} <{sender_email}>"
+        msg["To"] = to_email
+
+        part1 = MIMEText(text_body, "plain", "utf-8")
+        part2 = MIMEText(html_body, "html", "utf-8")
+        msg.attach(part1)
+        msg.attach(part2)
+
+        with smtplib.SMTP(smtp_host, smtp_port, timeout=10) as server:
+            server.starttls()
+            server.login(smtp_user, smtp_pass)
+            server.sendmail(sender_email, [to_email], msg.as_string())
+        print(f"Welcome email sent successfully to {to_email} from {sender_email}")
+        return True, "Email sent successfully"
+    except Exception as e:
+        print(f"Failed to dispatch email to {to_email}: {e}")
+        return False, str(e)
+
 def register_user(name, email, password):
     email = email.lower().strip()
     with get_db() as conn:
@@ -235,7 +366,12 @@ def register_user(name, email, password):
         )
         conn.commit()
         user_id = cursor.lastrowid
-        return True, {"id": user_id, "name": name.strip(), "email": email}
+        user_data = {"id": user_id, "name": name.strip(), "email": email}
+        
+        # Dispatch welcome email from owelessapp@gmail.com
+        send_welcome_email_py(user_data["name"], user_data["email"])
+        
+        return True, user_data
 
 def login_user(email, password):
     email = email.lower().strip()
@@ -438,7 +574,7 @@ if "active_group_id" not in st.session_state:
 if not st.session_state.user:
     st.markdown("""
     <div style="text-align: center; padding: 2rem 0;">
-        <h1 style="font-size: 2.5rem; font-weight: 800; color: #4f46e5; margin-bottom: 0.5rem;">⚖️ Bill Splitter</h1>
+        <h1 style="font-size: 2.5rem; font-weight: 800; color: #4f46e5; margin-bottom: 0.5rem;">⚖️ Oweless</h1>
         <p style="font-size: 1.1rem; color: #64748b;">Smart, transparent expense sharing & automated settlement calculations</p>
     </div>
     """, unsafe_allow_html=True)
