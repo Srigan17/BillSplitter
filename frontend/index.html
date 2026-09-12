@@ -1,0 +1,473 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard — Bill Splitter</title>
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/responsive.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+  <!-- Main App Header -->
+  <header class="app-header">
+    <div class="nav-container">
+      <a href="index.html" class="brand">
+        <div class="brand-icon">⚖️</div>
+        <span>BillSplitter</span>
+      </a>
+
+      <div class="nav-center">
+        <select id="groupSelect" class="group-selector-select" aria-label="Select Group">
+          <option value="" disabled selected>Loading your groups...</option>
+        </select>
+        <button id="openCreateGroupBtn" class="btn btn-secondary btn-sm" title="Create New Group">
+          + New Group
+        </button>
+      </div>
+
+      <div class="nav-right">
+        <button id="themeToggleBtn" class="btn-icon" title="Toggle Theme" aria-label="Toggle Dark Mode">
+          🌙
+        </button>
+        <div class="user-pill">
+          <div id="userAvatar" class="user-avatar-circle">U</div>
+          <span id="userName">User</span>
+        </div>
+        <button id="logoutBtn" class="btn btn-outline btn-sm" title="Log Out">
+          Log Out
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Content Layout -->
+  <main class="main-layout">
+    <!-- Empty State (No Groups Found) -->
+    <div id="noGroupsContainer" class="empty-state" style="display: none; margin-top: 3rem;">
+      <div class="empty-icon">📁</div>
+      <h2 class="empty-title">No Groups Found</h2>
+      <p class="empty-desc">Create your first group to start splitting bills and expenses with friends or roommates.</p>
+      <button id="emptyCreateGroupBtn" class="btn btn-primary" style="margin-top: 0.5rem;">
+        + Create a Group
+      </button>
+    </div>
+
+    <!-- Active Group Dashboard View -->
+    <div id="groupDashboardContainer" style="display: none;">
+      <!-- Group Banner Header -->
+      <section class="group-banner">
+        <div class="group-banner-top">
+          <div>
+            <h1 id="bannerGroupName" class="group-banner-title">Loading Group...</h1>
+            <p id="bannerGroupSub" style="opacity: 0.85; font-size: 0.875rem; margin-top: 0.25rem;">
+              Manage expenses, calculate fair shares, and settle debts
+            </p>
+          </div>
+          <div class="group-banner-actions">
+            <button id="openAddMemberBtn" class="btn btn-secondary">
+              👤 + Add Member
+            </button>
+            <button id="openAddExpenseBtn" class="btn btn-primary" style="background: #ffffff; color: var(--primary);">
+              💳 + Add Expense
+            </button>
+          </div>
+        </div>
+
+        <div class="members-strip">
+          <span style="font-weight: 600; opacity: 0.9;">Members:</span>
+          <div id="groupMembersList" style="display: flex; flex-wrap: wrap; gap: 0.5rem;">
+            <!-- Rendered Member Chips -->
+          </div>
+        </div>
+      </section>
+
+      <!-- 4 Top Metrics Summary Cards -->
+      <section class="metrics-grid">
+        <div class="metric-card">
+          <span class="metric-label">Total Group Spending</span>
+          <span id="metricGroupTotal" class="metric-value">₹0.00</span>
+          <span class="metric-sub">Sum of all group expenses</span>
+        </div>
+
+        <div class="metric-card">
+          <span class="metric-label">You Paid (Spent)</span>
+          <span id="metricUserSpent" class="metric-value">₹0.00</span>
+          <span class="metric-sub">Actual amount you paid upfront</span>
+        </div>
+
+        <div class="metric-card">
+          <span class="metric-label">Your Fair Share</span>
+          <span id="metricUserShare" class="metric-value">₹0.00</span>
+          <span class="metric-sub">Your portion across all splits</span>
+        </div>
+
+        <div id="netBalanceCard" class="metric-card">
+          <span class="metric-label">Your Net Balance</span>
+          <span id="metricNetBalance" class="metric-value">₹0.00</span>
+          <span id="metricNetBadge" class="badge-status settled" style="align-self: flex-start; margin-top: 0.25rem;">
+            All Settled
+          </span>
+        </div>
+      </section>
+
+      <!-- 2-Column Dashboard Body -->
+      <div class="dashboard-grid">
+        <!-- Left Column: Debts, Settlements & Expenses -->
+        <div style="display: flex; flex-direction: column; gap: 1.5rem;">
+          
+          <!-- YOU NEED TO PAY SECTION -->
+          <div class="card">
+            <div class="card-header">
+              <h2 class="card-title">
+                <span>🔴</span>
+                <span>You Need to Pay</span>
+              </h2>
+              <span id="payTotalBadge" class="badge-status pay">₹0.00 Total</span>
+            </div>
+            <div id="youNeedToPayList" class="debt-section">
+              <!-- Rendered List of Debts -->
+            </div>
+          </div>
+
+          <!-- YOU SHOULD RECEIVE SECTION -->
+          <div class="card">
+            <div class="card-header">
+              <h2 class="card-title">
+                <span>🟢</span>
+                <span>You Should Receive</span>
+              </h2>
+              <span id="receiveTotalBadge" class="badge-status receive">₹0.00 Total</span>
+            </div>
+            <div id="youShouldReceiveList" class="debt-section">
+              <!-- Rendered List of Receivables -->
+            </div>
+          </div>
+
+          <!-- OPTIMIZED SETTLEMENT PLAN -->
+          <div class="card">
+            <div class="card-header">
+              <h2 class="card-title">
+                <span>⚡</span>
+                <span>Optimized Settlement Plan</span>
+              </h2>
+              <span id="minTransactionsBadge" class="badge-status settled">0 Transactions</span>
+            </div>
+            <p style="font-size: 0.8125rem; color: var(--text-muted); margin-bottom: 0.75rem;">
+              Algorithm minimizes total transactions required to settle everyone.
+            </p>
+            <div id="optimizedSettlementList" class="debt-section">
+              <!-- Rendered Optimized Transactions -->
+            </div>
+          </div>
+
+          <!-- RECENT EXPENSES LIST -->
+          <div class="card">
+            <div class="card-header">
+              <h2 class="card-title">
+                <span>🧾</span>
+                <span>Recent Expenses</span>
+              </h2>
+              <button id="addExpenseInlineBtn" class="btn btn-primary btn-sm">
+                + Add Expense
+              </button>
+            </div>
+            <div id="recentExpensesList" class="expenses-list">
+              <!-- Rendered Expense Items -->
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Right Column: Spending Summary, Chart.js & History -->
+        <div style="display: flex; flex-direction: column; gap: 1.5rem;">
+          
+          <!-- CATEGORY SPENDING & CHART -->
+          <div class="card">
+            <div class="card-header">
+              <h2 class="card-title">
+                <span>📊</span>
+                <span>Category Spending</span>
+              </h2>
+            </div>
+            
+            <div style="position: relative; height: 220px; width: 100%; margin-bottom: 1.25rem;">
+              <canvas id="categoryChart"></canvas>
+            </div>
+
+            <div style="display: flex; flex-direction: column; gap: 0.75rem;">
+              <h3 style="font-size: 0.875rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">
+                Group Category Breakdown
+              </h3>
+              <div id="groupCategoryList" style="display: flex; flex-direction: column; gap: 0.375rem;">
+                <!-- Category items -->
+              </div>
+
+              <h3 style="font-size: 0.875rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; margin-top: 0.5rem;">
+                My Personal Spending
+              </h3>
+              <div id="userCategoryList" style="display: flex; flex-direction: column; gap: 0.375rem;">
+                <!-- User personal category items -->
+              </div>
+            </div>
+          </div>
+
+          <!-- SETTLEMENT HISTORY -->
+          <div class="card">
+            <div class="card-header">
+              <h2 class="card-title">
+                <span>📜</span>
+                <span>Settlement History</span>
+              </h2>
+            </div>
+            <div id="settlementHistoryList" style="display: flex; flex-direction: column; gap: 0.625rem;">
+              <!-- Historical Settlements -->
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- ================= MODALS ================= -->
+
+  <!-- 1. CREATE GROUP MODAL -->
+  <div id="createGroupModal" class="modal-overlay">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 class="modal-title">Create New Group</h3>
+        <button class="btn-icon close-modal-btn">&times;</button>
+      </div>
+      <form id="createGroupForm">
+        <div class="modal-body">
+          <div class="form-group">
+            <label class="form-label" for="newGroupName">Group Name</label>
+            <input type="text" id="newGroupName" class="form-control" placeholder="e.g. Goa Trip, Roommates, Office Outing" required>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary close-modal-btn">Cancel</button>
+          <button type="submit" id="submitCreateGroupBtn" class="btn btn-primary">Create Group</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- 2. ADD MEMBER MODAL -->
+  <div id="addMemberModal" class="modal-overlay">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 class="modal-title">Add Member to Group</h3>
+        <button class="btn-icon close-modal-btn">&times;</button>
+      </div>
+      <form id="addMemberForm">
+        <div class="modal-body">
+          <p style="font-size: 0.875rem; color: var(--text-muted);">
+            Search for an existing registered user by their exact registered email address.
+          </p>
+          <div class="form-group">
+            <label class="form-label" for="memberEmail">User Email Address</label>
+            <input type="email" id="memberEmail" class="form-control" placeholder="friend@example.com" required>
+          </div>
+          <div id="addMemberAlert" class="alert-box"></div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary close-modal-btn">Cancel</button>
+          <button type="submit" id="submitAddMemberBtn" class="btn btn-primary">Add Member</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- 3. ADD EXPENSE MODAL -->
+  <div id="addExpenseModal" class="modal-overlay">
+    <div class="modal-content" style="max-width: 620px;">
+      <div class="modal-header">
+        <h3 class="modal-title">Add Group Expense</h3>
+        <button class="btn-icon close-modal-btn">&times;</button>
+      </div>
+      <form id="addExpenseForm">
+        <div class="modal-body">
+          
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label" for="expenseTitle">Expense Title / Description</label>
+              <input type="text" id="expenseTitle" class="form-control" placeholder="e.g. Dinner at Restaurant, Hotel, Taxi" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="expenseAmount">Total Amount (₹)</label>
+              <input type="number" id="expenseAmount" class="form-control" placeholder="0.00" min="0.01" step="0.01" required>
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label" for="expenseCategory">Category</label>
+              <select id="expenseCategory" class="form-control" required>
+                <option value="Food">🍔 Food</option>
+                <option value="Travel">✈️ Travel</option>
+                <option value="Transport">🚕 Transport</option>
+                <option value="Stay">🏨 Stay</option>
+                <option value="Entertainment">🎬 Entertainment</option>
+                <option value="Shopping">🛍️ Shopping</option>
+                <option value="Other">📦 Other</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="expenseDate">Date</label>
+              <input type="date" id="expenseDate" class="form-control" required>
+            </div>
+          </div>
+
+          <hr style="border: 0; border-top: 1px solid var(--border-color);">
+
+          <!-- WHO PAID SECTION -->
+          <div class="form-group">
+            <label class="form-label">Who Paid for this expense?</label>
+            <div class="radio-pill-group">
+              <input type="radio" name="payerType" id="singlePayerRadio" value="single" checked>
+              <label class="radio-pill-label" for="singlePayerRadio">Single Payer</label>
+
+              <input type="radio" name="payerType" id="multiPayerRadio" value="multiple">
+              <label class="radio-pill-label" for="multiPayerRadio">Multiple Payers</label>
+            </div>
+          </div>
+
+          <!-- Single Payer Select -->
+          <div id="singlePayerContainer" class="form-group">
+            <select id="singlePayerSelect" class="form-control">
+              <!-- Dynamically Populated -->
+            </select>
+          </div>
+
+          <!-- Multi Payer Inputs -->
+          <div id="multiPayerContainer" class="form-group" style="display: none;">
+            <div id="multiPayerInputsList" style="display: flex; flex-direction: column;">
+              <!-- Dynamically populated rows -->
+            </div>
+            <div id="multiPayerSummary" class="calc-summary-pill invalid" style="margin-top: 0.5rem;">
+              <span>Total Paid: ₹0.00</span>
+              <span id="multiPayerRemainder">Remaining: ₹0.00</span>
+            </div>
+          </div>
+
+          <hr style="border: 0; border-top: 1px solid var(--border-color);">
+
+          <!-- HOW TO SPLIT SECTION -->
+          <div class="form-group">
+            <label class="form-label">Split Method</label>
+            <div class="radio-pill-group">
+              <input type="radio" name="splitMethod" id="splitEqualRadio" value="equal" checked>
+              <label class="radio-pill-label" for="splitEqualRadio">Equal (=)</label>
+
+              <input type="radio" name="splitMethod" id="splitPercentageRadio" value="percentage">
+              <label class="radio-pill-label" for="splitPercentageRadio">Percentage (%)</label>
+
+              <input type="radio" name="splitMethod" id="splitExactRadio" value="exact">
+              <label class="radio-pill-label" for="splitExactRadio">Exact (₹)</label>
+            </div>
+          </div>
+
+          <!-- Split Inputs List -->
+          <div class="form-group">
+            <div id="splitInputsList" style="display: flex; flex-direction: column;">
+              <!-- Dynamically Populated Member Split Rows -->
+            </div>
+            <div id="splitSummaryPill" class="calc-summary-pill valid" style="margin-top: 0.5rem;">
+              <span id="splitSummaryLabel">Split Total: ₹0.00</span>
+              <span id="splitSummaryStatus">Balanced</span>
+            </div>
+          </div>
+
+          <div id="addExpenseAlert" class="alert-box"></div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary close-modal-btn">Cancel</button>
+          <button type="submit" id="submitAddExpenseBtn" class="btn btn-primary">Save Expense</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- 4. EXPENSE DETAILS MODAL -->
+  <div id="expenseDetailsModal" class="modal-overlay">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 id="expDetailTitle" class="modal-title">Expense Details</h3>
+        <button class="btn-icon close-modal-btn">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div style="display: flex; align-items: center; justify-content: space-between;">
+          <span id="expDetailCategory" class="badge-status settled">Category</span>
+          <span id="expDetailDate" style="font-size: 0.875rem; color: var(--text-muted);">Date</span>
+        </div>
+
+        <div style="text-align: center; padding: 1rem 0;">
+          <span style="font-size: 0.875rem; color: var(--text-muted);">Total Expense</span>
+          <h2 id="expDetailTotal" style="font-size: 2rem; font-weight: 800; color: var(--text-main);">₹0.00</h2>
+        </div>
+
+        <!-- Current User's Share Highlight Card -->
+        <div id="expDetailUserShareBox" class="card" style="background: var(--bg-card-hover); padding: 1rem;">
+          <!-- Dynamically populated user share sentence -->
+        </div>
+
+        <div>
+          <h4 style="font-size: 0.875rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; margin-bottom: 0.5rem;">
+            Paid By
+          </h4>
+          <div id="expDetailPaymentsList" style="display: flex; flex-direction: column; gap: 0.375rem;"></div>
+        </div>
+
+        <div>
+          <h4 style="font-size: 0.875rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; margin-bottom: 0.5rem;">
+            Split Breakdown
+          </h4>
+          <div id="expDetailSplitsList" style="display: flex; flex-direction: column; gap: 0.375rem;"></div>
+        </div>
+      </div>
+      <div class="modal-footer" style="justify-content: space-between;">
+        <button id="deleteExpenseBtn" class="btn btn-danger btn-sm">Delete Expense</button>
+        <button type="button" class="btn btn-secondary close-modal-btn">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 5. DEBT BREAKDOWN AUDIT MODAL (Traceability) -->
+  <div id="debtAuditModal" class="modal-overlay">
+    <div class="modal-content" style="max-width: 600px;">
+      <div class="modal-header">
+        <h3 id="debtAuditTitle" class="modal-title">Debt Breakdown & Reasons</h3>
+        <button class="btn-icon close-modal-btn">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p id="debtAuditSubtitle" style="font-size: 0.9375rem; color: var(--text-muted); font-weight: 500;">
+          Audit trail showing exactly which expenses contributed to this debt.
+        </p>
+        <div id="debtAuditExpensesList" style="display: flex; flex-direction: column; gap: 0.75rem;">
+          <!-- Rendered contributing expenses with math -->
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary close-modal-btn">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification Container -->
+  <div id="toastContainer" class="toast-container"></div>
+
+  <!-- Application JavaScript Modules -->
+  <script src="js/api.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/groups.js"></script>
+  <script src="js/expenses.js"></script>
+  <script src="js/settlements.js"></script>
+  <script src="js/dashboard.js"></script>
+</body>
+</html>
