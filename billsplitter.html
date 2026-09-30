@@ -1,0 +1,2273 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bill Splitter - Smart Expense Management</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+
+        :root {
+            --primary-color: #6366f1;
+            --primary-dark: #4f46e5;
+            --secondary-color: #10b981;
+            --accent-color: #f59e0b;
+            --danger-color: #ef4444;
+            --warning-color: #f59e0b;
+            --bg-color: #ffffff;
+            --surface-color: #f8fafc;
+            --card-color: #ffffff;
+            --text-primary: #1f2937;
+            --text-secondary: #6b7280;
+            --text-muted: #9ca3af;
+            --border-color: #e5e7eb;
+            --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            --shadow-lg: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+            --shadow-xl: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+        }
+
+        [data-theme="dark"] {
+            --bg-color: #0f172a;
+            --surface-color: #1e293b;
+            --card-color: #334155;
+            --text-primary: #f1f5f9;
+            --text-secondary: #cbd5e1;
+            --text-muted: #94a3b8;
+            --border-color: #475569;
+            --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
+            --shadow-lg: 0 20px 25px -5px rgba(0, 0, 0, 0.3);
+            --shadow-xl: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-primary);
+            line-height: 1.6;
+            transition: all 0.3s ease;
+        }
+
+        /* Header Styles */
+        .header {
+            background: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-dark) 100%);
+            color: white;
+            padding: 2rem 0;
+            box-shadow: var(--shadow-lg);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .header-content {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 1rem;
+        }
+
+        .logo {
+            font-size: 2.5rem;
+            font-weight: 800;
+            letter-spacing: -0.02em;
+            background: linear-gradient(45deg, #ffffff, #e0e7ff);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .header-actions {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .theme-toggle {
+            background: rgba(255, 255, 255, 0.1);
+            border: 2px solid rgba(255, 255, 255, 0.2);
+            color: white;
+            border-radius: 0.75rem;
+            padding: 0.75rem;
+            cursor: pointer;
+            font-size: 1.25rem;
+            transition: all 0.3s ease;
+            backdrop-filter: blur(10px);
+        }
+
+        .theme-toggle:hover {
+            background: rgba(255, 255, 255, 0.2);
+            transform: scale(1.05);
+        }
+
+        .export-btn, .import-btn {
+            background: rgba(255, 255, 255, 0.1);
+            border: 2px solid rgba(255, 255, 255, 0.2);
+            color: white;
+            padding: 0.75rem 1.5rem;
+            border-radius: 0.75rem;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            backdrop-filter: blur(10px);
+        }
+
+        .export-btn:hover, .import-btn:hover {
+            background: rgba(255, 255, 255, 0.2);
+            transform: translateY(-2px);
+        }
+
+        /* Main Layout */
+        .main {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem;
+            display: grid;
+            grid-template-columns: 1fr 2fr;
+            gap: 2rem;
+            min-height: calc(100vh - 200px);
+        }
+
+        .sidebar {
+            background: var(--card-color);
+            border-radius: 1.5rem;
+            padding: 2rem;
+            box-shadow: var(--shadow);
+            border: 1px solid var(--border-color);
+            height: fit-content;
+            position: sticky;
+            top: 120px;
+        }
+
+        .content {
+            display: flex;
+            flex-direction: column;
+            gap: 2rem;
+        }
+
+        /* Group Management */
+        .section-title {
+            font-size: 1.5rem;
+            font-weight: 700;
+            margin-bottom: 1.5rem;
+            color: var(--text-primary);
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .section-icon {
+            font-size: 1.75rem;
+        }
+
+        .group-selector {
+            margin-bottom: 2rem;
+        }
+
+        .group-tabs {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .group-tab {
+            background: var(--surface-color);
+            border: 2px solid var(--border-color);
+            color: var(--text-secondary);
+            padding: 0.75rem 1rem;
+            border-radius: 0.75rem;
+            cursor: pointer;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            position: relative;
+        }
+
+        .group-tab:hover {
+            border-color: var(--primary-color);
+            color: var(--primary-color);
+        }
+
+        .group-tab.active {
+            background: var(--primary-color);
+            color: white;
+            border-color: var(--primary-color);
+        }
+
+        .add-group-btn {
+            background: var(--secondary-color);
+            color: white;
+            border: none;
+            padding: 0.75rem 1rem;
+            border-radius: 0.75rem;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .add-group-btn:hover {
+            background: #059669;
+            transform: translateY(-2px);
+        }
+
+        /* Members Section */
+        .members-list {
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .member-item {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            padding: 1rem;
+            background: var(--surface-color);
+            border-radius: 0.75rem;
+            border: 1px solid var(--border-color);
+        }
+
+        .member-avatar {
+            width: 3rem;
+            height: 3rem;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--primary-color), var(--accent-color));
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: 700;
+            font-size: 1.25rem;
+        }
+
+        .member-info {
+            flex: 1;
+        }
+
+        .member-name {
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .member-balance {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+        }
+
+        .member-balance.positive {
+            color: var(--secondary-color);
+        }
+
+        .member-balance.negative {
+            color: var(--danger-color);
+        }
+
+        .remove-member {
+            background: var(--danger-color);
+            color: white;
+            border: none;
+            padding: 0.5rem;
+            border-radius: 0.5rem;
+            cursor: pointer;
+            font-size: 0.875rem;
+        }
+
+        /* Forms */
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .form-label {
+            font-weight: 600;
+            color: var(--text-primary);
+            font-size: 0.875rem;
+        }
+
+        .form-input, .form-select {
+            padding: 0.75rem 1rem;
+            border: 2px solid var(--border-color);
+            border-radius: 0.75rem;
+            background: var(--bg-color);
+            color: var(--text-primary);
+            font-size: 1rem;
+            transition: all 0.3s ease;
+        }
+
+        .form-input:focus, .form-select:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+        }
+
+        .btn {
+            background: var(--primary-color);
+            color: white;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 0.75rem;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 1rem;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+        }
+
+        .btn:hover {
+            background: var(--primary-dark);
+            transform: translateY(-2px);
+        }
+
+        .btn-secondary {
+            background: var(--surface-color);
+            color: var(--text-primary);
+            border: 2px solid var(--border-color);
+        }
+
+        .btn-secondary:hover {
+            background: var(--border-color);
+        }
+
+        .btn-danger {
+            background: var(--danger-color);
+        }
+
+        .btn-danger:hover {
+            background: #dc2626;
+        }
+
+        /* Cards */
+        .card {
+            background: var(--card-color);
+            border-radius: 1.5rem;
+            padding: 2rem;
+            box-shadow: var(--shadow);
+            border: 1px solid var(--border-color);
+            transition: all 0.3s ease;
+        }
+
+        .card:hover {
+            box-shadow: var(--shadow-lg);
+        }
+
+        /* Dashboard */
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 2rem;
+            margin-bottom: 2rem;
+        }
+
+        .stats-card {
+            background: linear-gradient(135deg, var(--primary-color), var(--primary-dark));
+            color: white;
+            border-radius: 1.5rem;
+            padding: 2rem;
+            text-align: center;
+        }
+
+        .stats-number {
+            font-size: 2.5rem;
+            font-weight: 800;
+            margin-bottom: 0.5rem;
+        }
+
+        .stats-label {
+            font-size: 1rem;
+            opacity: 0.9;
+        }
+
+        .chart-container {
+            position: relative;
+            height: 300px;
+            margin: 1rem 0;
+        }
+
+        /* Expenses List */
+        .expenses-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+            flex-wrap: wrap;
+            gap: 1rem;
+        }
+
+        .expense-filters {
+            display: flex;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+        }
+
+        .filter-btn {
+            background: var(--surface-color);
+            border: 2px solid var(--border-color);
+            color: var(--text-secondary);
+            padding: 0.5rem 1rem;
+            border-radius: 0.5rem;
+            cursor: pointer;
+            font-size: 0.875rem;
+            font-weight: 500;
+            transition: all 0.3s ease;
+        }
+
+        .filter-btn:hover, .filter-btn.active {
+            background: var(--primary-color);
+            color: white;
+            border-color: var(--primary-color);
+        }
+
+        .expenses-list {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .expense-item {
+            background: var(--card-color);
+            border: 1px solid var(--border-color);
+            border-radius: 1rem;
+            padding: 1.5rem;
+            transition: all 0.3s ease;
+            position: relative;
+        }
+
+        .expense-item:hover {
+            box-shadow: var(--shadow-lg);
+            transform: translateY(-2px);
+        }
+
+        .expense-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 1rem;
+        }
+
+        .expense-title {
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            margin-bottom: 0.25rem;
+        }
+
+        .expense-amount {
+            font-size: 1.5rem;
+            font-weight: 800;
+            color: var(--primary-color);
+        }
+
+        .expense-meta {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            color: var(--text-secondary);
+            font-size: 0.875rem;
+        }
+
+        .expense-actions {
+            display: flex;
+            gap: 0.5rem;
+            position: absolute;
+            top: 1rem;
+            right: 1rem;
+        }
+
+        .action-btn {
+            background: var(--surface-color);
+            border: 1px solid var(--border-color);
+            color: var(--text-secondary);
+            padding: 0.5rem;
+            border-radius: 0.5rem;
+            cursor: pointer;
+            font-size: 0.875rem;
+            transition: all 0.3s ease;
+        }
+
+        .action-btn:hover {
+            background: var(--primary-color);
+            color: white;
+            border-color: var(--primary-color);
+        }
+
+        .action-btn.danger:hover {
+            background: var(--danger-color);
+            border-color: var(--danger-color);
+        }
+
+        /* Settlement Summary */
+        .settlement-list {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .settlement-item {
+            background: var(--surface-color);
+            border: 1px solid var(--border-color);
+            border-radius: 1rem;
+            padding: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .settlement-arrow {
+            font-size: 1.5rem;
+            color: var(--primary-color);
+        }
+
+        .settlement-text {
+            flex: 1;
+            font-weight: 600;
+        }
+
+        .settlement-amount {
+            font-size: 1.25rem;
+            font-weight: 800;
+            color: var(--secondary-color);
+        }
+
+        /* Modal */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+            backdrop-filter: blur(5px);
+        }
+
+        .modal.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background: var(--card-color);
+            border-radius: 1.5rem;
+            padding: 2rem;
+            width: 90%;
+            max-width: 500px;
+            max-height: 90vh;
+            overflow-y: auto;
+            box-shadow: var(--shadow-xl);
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2rem;
+        }
+
+        .modal-title {
+            font-size: 1.5rem;
+            font-weight: 700;
+        }
+
+        .close-btn {
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            cursor: pointer;
+            color: var(--text-secondary);
+            padding: 0.5rem;
+        }
+
+        .close-btn:hover {
+            color: var(--text-primary);
+        }
+
+        /* Split Options */
+        .split-options {
+            display: flex;
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+            flex-wrap: wrap;
+        }
+
+        .split-option {
+            background: var(--surface-color);
+            border: 2px solid var(--border-color);
+            color: var(--text-secondary);
+            padding: 0.75rem 1rem;
+            border-radius: 0.75rem;
+            cursor: pointer;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            flex: 1;
+            text-align: center;
+            min-width: 120px;
+        }
+
+        .split-option:hover, .split-option.active {
+            background: var(--primary-color);
+            color: white;
+            border-color: var(--primary-color);
+        }
+
+        .split-details {
+            display: none;
+            margin-top: 1rem;
+        }
+
+        .split-details.active {
+            display: block;
+        }
+
+        .member-split {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            margin-bottom: 0.75rem;
+            padding: 0.75rem;
+            background: var(--surface-color);
+            border-radius: 0.5rem;
+        }
+
+        .member-split-name {
+            flex: 1;
+            font-weight: 600;
+        }
+
+        .member-split-input {
+            width: 100px;
+            padding: 0.5rem;
+            border: 1px solid var(--border-color);
+            border-radius: 0.5rem;
+            text-align: right;
+        }
+
+        /* Toast Notifications */
+        .toast {
+            position: fixed;
+            top: 2rem;
+            right: 2rem;
+            background: var(--secondary-color);
+            color: white;
+            padding: 1rem 1.5rem;
+            border-radius: 0.75rem;
+            box-shadow: var(--shadow-lg);
+            z-index: 1001;
+            transform: translateX(100%);
+            transition: transform 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            font-weight: 600;
+            max-width: 400px;
+        }
+
+        .toast.show {
+            transform: translateX(0);
+        }
+
+        .toast.error {
+            background: var(--danger-color);
+        }
+
+        .toast.warning {
+            background: var(--warning-color);
+        }
+
+        /* Empty States */
+        .empty-state {
+            text-align: center;
+            padding: 3rem 2rem;
+            color: var(--text-secondary);
+        }
+
+        .empty-icon {
+            font-size: 4rem;
+            margin-bottom: 1rem;
+            opacity: 0.5;
+        }
+
+        .empty-title {
+            font-size: 1.25rem;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+            color: var(--text-primary);
+        }
+
+        .empty-description {
+            margin-bottom: 1.5rem;
+        }
+
+        /* Hidden File Input */
+        .hidden-input {
+            display: none;
+        }
+
+        /* Responsive Design */
+        @media (max-width: 1024px) {
+            .main {
+                grid-template-columns: 1fr;
+                gap: 1.5rem;
+            }
+
+            .sidebar {
+                position: static;
+            }
+
+            .dashboard-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .header-content {
+                flex-direction: column;
+                text-align: center;
+            }
+
+            .main {
+                padding: 1rem;
+            }
+
+            .card {
+                padding: 1.5rem;
+            }
+
+            .form-row {
+                grid-template-columns: 1fr;
+            }
+
+            .expenses-header {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .expense-actions {
+                position: static;
+                margin-top: 1rem;
+                justify-content: flex-end;
+            }
+
+            .split-options {
+                flex-direction: column;
+            }
+
+            .split-option {
+                min-width: auto;
+            }
+
+            .toast {
+                right: 1rem;
+                left: 1rem;
+                transform: translateY(-100%);
+            }
+
+            .toast.show {
+                transform: translateY(0);
+            }
+        }
+
+        @media (max-width: 480px) {
+            .modal-content {
+                padding: 1.5rem;
+                margin: 1rem;
+            }
+
+            .member-split {
+                flex-direction: column;
+                align-items: stretch;
+                gap: 0.5rem;
+            }
+
+            .member-split-input {
+                width: 100%;
+            }
+        }
+
+        /* Loading Animation */
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(255,255,255,.3);
+            border-radius: 50%;
+            border-top-color: #fff;
+            animation: spin 1s ease-in-out infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Smooth Animations */
+        .fade-in {
+            animation: fadeIn 0.3s ease-in-out;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .slide-in {
+            animation: slideIn 0.3s ease-in-out;
+        }
+
+        @keyframes slideIn {
+            from { transform: translateX(-20px); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <header class="header">
+        <div class="header-content">
+            <h1 class="logo">Bill Splitter</h1>
+            <div class="header-actions">
+                <button class="export-btn" onclick="exportData()">📤 Export</button>
+                <button class="import-btn" onclick="document.getElementById('importFile').click()">📥 Import</button>
+                <button class="theme-toggle" id="themeToggle">🌙</button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="main">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <!-- Group Management -->
+            <section class="group-selector">
+                <h2 class="section-title">
+                    <span class="section-icon">👥</span>
+                    Groups
+                </h2>
+                <div class="group-tabs" id="groupTabs">
+                    <!-- Groups will be dynamically added here -->
+                </div>
+                <button class="add-group-btn" onclick="showAddGroupModal()">
+                    ➕ Add Group
+                </button>
+            </section>
+
+            <!-- Members -->
+            <section class="members-section">
+                <h3 class="section-title">
+                    <span class="section-icon">👤</span>
+                    Members
+                </h3>
+                <div class="members-list" id="membersList">
+                    <!-- Members will be dynamically added here -->
+                </div>
+                <button class="btn btn-secondary" onclick="showAddMemberModal()" style="width: 100%;">
+                    Add Member
+                </button>
+            </section>
+
+            <!-- Settlement Summary -->
+            <section class="settlement-section">
+                <h3 class="section-title">
+                    <span class="section-icon">💰</span>
+                    Settlements
+                </h3>
+                <div class="settlement-list" id="settlementList">
+                    <!-- Settlements will be dynamically added here -->
+                </div>
+                <button class="btn" onclick="generatePDF()" style="width: 100%; margin-top: 1rem;">
+                    📄 Generate Report
+                </button>
+            </section>
+        </aside>
+
+        <!-- Content Area -->
+        <div class="content">
+            <!-- Dashboard -->
+            <section class="card">
+                <h2 class="section-title">
+                    <span class="section-icon">📊</span>
+                    Dashboard
+                </h2>
+                <div class="dashboard-grid">
+                    <div class="stats-card">
+                        <div class="stats-number" id="totalExpenses">$0</div>
+                        <div class="stats-label">Total Expenses</div>
+                    </div>
+                    <div class="stats-card">
+                        <div class="stats-number" id="totalMembers">0</div>
+                        <div class="stats-label">Members</div>
+                    </div>
+                </div>
+                <div class="chart-container">
+                    <canvas id="expenseChart"></canvas>
+                </div>
+            </section>
+
+            <!-- Expenses -->
+            <section class="card">
+                <div class="expenses-header">
+                    <h2 class="section-title">
+                        <span class="section-icon">💳</span>
+                        Expenses
+                    </h2>
+                    <div class="expense-filters">
+                        <button class="filter-btn active" data-filter="all">All</button>
+                        <button class="filter-btn" data-filter="recent">Recent</button>
+                        <button class="filter-btn" data-filter="highest">Highest</button>
+                    </div>
+                    <button class="btn" onclick="showAddExpenseModal()">
+                        ➕ Add Expense
+                    </button>
+                </div>
+                <div class="expenses-list" id="expensesList">
+                    <!-- Expenses will be dynamically added here -->
+                </div>
+            </section>
+        </div>
+    </main>
+
+    <!-- Modals -->
+    <!-- Add Group Modal -->
+    <div class="modal" id="addGroupModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title">Create New Group</h3>
+                <button class="close-btn" onclick="closeModal('addGroupModal')">&times;</button>
+            </div>
+            <form id="addGroupForm">
+                <div class="form-group">
+                    <label class="form-label">Group Name</label>
+                    <input type="text" class="form-input" id="groupName" placeholder="e.g., Trip to Paris" required>
+                </div>
+                <button type="submit" class="btn" style="width: 100%;">Create Group</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Add Member Modal -->
+    <div class="modal" id="addMemberModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title">Add Member</h3>
+                <button class="close-btn" onclick="closeModal('addMemberModal')">&times;</button>
+            </div>
+            <form id="addMemberForm">
+                <div class="form-group">
+                    <label class="form-label">Member Name</label>
+                    <input type="text" class="form-input" id="memberName" placeholder="Enter member name" required>
+                </div>
+                <button type="submit" class="btn" style="width: 100%;">Add Member</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Add/Edit Expense Modal -->
+    <div class="modal" id="expenseModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title" id="expenseModalTitle">Add Expense</h3>
+                <button class="close-btn" onclick="closeModal('expenseModal')">&times;</button>
+            </div>
+            <form id="expenseForm">
+                <div class="form-group">
+                    <label class="form-label">Expense Title</label>
+                    <input type="text" class="form-input" id="expenseTitle" placeholder="e.g., Dinner at restaurant" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Amount ($)</label>
+                    <input type="number" class="form-input" id="expenseAmount" placeholder="0.00" step="0.01" required>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">Payment Method</label>
+                    <div class="split-options">
+                        <button type="button" class="split-option active" data-payment="single">Single Payer</button>
+                        <button type="button" class="split-option" data-payment="multiple">Multiple Payers</button>
+                    </div>
+                </div>
+                
+                <div class="form-group" id="singlePayerSection">
+                    <label class="form-label">Paid by</label>
+                    <select class="form-select" id="expensePayer" required>
+                        <!-- Options will be populated dynamically -->
+                    </select>
+                </div>
+                
+                <div class="form-group" id="multiplePayersSection" style="display: none;">
+                    <label class="form-label">Who paid how much?</label>
+                    <div id="paymentBreakdown">
+                        <!-- Payment breakdown will be populated dynamically -->
+                    </div>
+                    <div id="paymentValidation" style="margin-top: 0.5rem; font-size: 0.875rem; color: var(--text-secondary);">
+                        <!-- Validation message will appear here -->
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Date</label>
+                    <input type="date" class="form-input" id="expenseDate" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Split Method</label>
+                    <div class="split-options">
+                        <button type="button" class="split-option active" data-split="equal">Equal Split</button>
+                        <button type="button" class="split-option" data-split="percentage">Percentage</button>
+                        <button type="button" class="split-option" data-split="exact">Exact Amount</button>
+                    </div>
+                </div>
+                <div class="split-details" id="splitDetails">
+                    <!-- Split details will be populated dynamically -->
+                </div>
+                <div style="display: flex; gap: 1rem; margin-top: 2rem;">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('expenseModal')" style="flex: 1;">Cancel</button>
+                    <button type="submit" class="btn" style="flex: 1;">Save Expense</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Hidden file input for import -->
+    <input type="file" id="importFile" class="hidden-input" accept=".json" onchange="importData(event)">
+
+    <script>
+        // Application State
+        let appState = {
+            groups: JSON.parse(localStorage.getItem('billSplitterGroups')) || [],
+            currentGroupId: localStorage.getItem('billSplitterCurrentGroup') || null,
+            expenses: JSON.parse(localStorage.getItem('billSplitterExpenses')) || [],
+            editingExpenseId: null
+        };
+
+        let expenseChart = null;
+
+        // Initialize the application
+        function init() {
+            // Create default group if none exists
+            if (appState.groups.length === 0) {
+                const defaultGroup = {
+                    id: generateId(),
+                    name: 'My Group',
+                    members: []
+                };
+                appState.groups.push(defaultGroup);
+                appState.currentGroupId = defaultGroup.id;
+                saveData();
+            }
+
+            // Set current group if not set
+            if (!appState.currentGroupId && appState.groups.length > 0) {
+                appState.currentGroupId = appState.groups[0].id;
+            }
+
+            // Set today's date as default
+            document.getElementById('expenseDate').value = new Date().toISOString().split('T')[0];
+
+            // Setup event listeners
+            setupEventListeners();
+            
+            // Load theme
+            loadTheme();
+            
+            // Render initial UI
+            renderGroups();
+            renderMembers();
+            renderExpenses();
+            renderSettlements();
+            renderDashboard();
+        }
+
+        // Setup event listeners
+        function setupEventListeners() {
+            // Theme toggle
+            document.getElementById('themeToggle').addEventListener('click', toggleTheme);
+
+            // Forms
+            document.getElementById('addGroupForm').addEventListener('submit', handleAddGroup);
+            document.getElementById('addMemberForm').addEventListener('submit', handleAddMember);
+            document.getElementById('expenseForm').addEventListener('submit', handleExpenseSubmit);
+
+            // Split options
+            document.querySelectorAll('.split-option').forEach(btn => {
+                btn.addEventListener('click', handleSplitOptionChange);
+            });
+
+            // Payment method options
+            document.querySelectorAll('[data-payment]').forEach(btn => {
+                btn.addEventListener('click', handlePaymentMethodChange);
+            });
+
+            // Expense filters
+            document.querySelectorAll('.filter-btn').forEach(btn => {
+                btn.addEventListener('click', handleExpenseFilter);
+            });
+
+            // Close modals on outside click
+            document.querySelectorAll('.modal').forEach(modal => {
+                modal.addEventListener('click', (e) => {
+                    if (e.target === modal) {
+                        closeModal(modal.id);
+                    }
+                });
+            });
+
+            // Keyboard shortcuts
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape') {
+                    document.querySelectorAll('.modal.active').forEach(modal => {
+                        closeModal(modal.id);
+                    });
+                }
+            });
+        }
+
+        // Utility Functions
+        function generateId() {
+            return Date.now().toString(36) + Math.random().toString(36).substr(2);
+        }
+
+        function saveData() {
+            localStorage.setItem('billSplitterGroups', JSON.stringify(appState.groups));
+            localStorage.setItem('billSplitterExpenses', JSON.stringify(appState.expenses));
+            localStorage.setItem('billSplitterCurrentGroup', appState.currentGroupId);
+        }
+
+        function getCurrentGroup() {
+            return appState.groups.find(g => g.id === appState.currentGroupId);
+        }
+
+        function showToast(message, type = 'success') {
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+            toast.innerHTML = `
+                <span>${type === 'success' ? '✅' : type === 'error' ? '❌' : '⚠️'}</span>
+                <span>${message}</span>
+            `;
+            
+            document.body.appendChild(toast);
+            
+            setTimeout(() => toast.classList.add('show'), 100);
+            
+            setTimeout(() => {
+                toast.classList.remove('show');
+                setTimeout(() => document.body.removeChild(toast), 300);
+            }, 3000);
+        }
+
+        // Group Management
+        function renderGroups() {
+            const groupTabs = document.getElementById('groupTabs');
+            groupTabs.innerHTML = appState.groups.map(group => `
+                <button class="group-tab ${group.id === appState.currentGroupId ? 'active' : ''}" 
+                        onclick="switchGroup('${group.id}')">
+                    ${group.name}
+                </button>
+            `).join('');
+        }
+
+        function switchGroup(groupId) {
+            appState.currentGroupId = groupId;
+            saveData();
+            renderGroups();
+            renderMembers();
+            renderExpenses();
+            renderSettlements();
+            renderDashboard();
+        }
+
+        function showAddGroupModal() {
+            document.getElementById('addGroupModal').classList.add('active');
+            document.getElementById('groupName').focus();
+        }
+
+        function handleAddGroup(e) {
+            e.preventDefault();
+            const name = document.getElementById('groupName').value.trim();
+            
+            if (!name) return;
+
+            const newGroup = {
+                id: generateId(),
+                name,
+                members: []
+            };
+
+            appState.groups.push(newGroup);
+            appState.currentGroupId = newGroup.id;
+            saveData();
+
+            renderGroups();
+            renderMembers();
+            renderExpenses();
+            renderSettlements();
+            renderDashboard();
+
+            closeModal('addGroupModal');
+            document.getElementById('addGroupForm').reset();
+            showToast(`Group "${name}" created successfully!`);
+        }
+
+        // Member Management
+        function renderMembers() {
+            const membersList = document.getElementById('membersList');
+            const currentGroup = getCurrentGroup();
+            
+            if (!currentGroup || currentGroup.members.length === 0) {
+                membersList.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-icon">👤</div>
+                        <div class="empty-title">No members yet</div>
+                        <div class="empty-description">Add members to start splitting expenses</div>
+                    </div>
+                `;
+                return;
+            }
+
+            const balances = calculateBalances();
+            
+            membersList.innerHTML = currentGroup.members.map(member => {
+                const balance = balances[member.id] || 0;
+                const balanceClass = balance > 0 ? 'positive' : balance < 0 ? 'negative' : '';
+                const balanceText = balance > 0 ? `Gets $${Math.abs(balance).toFixed(2)}` : 
+                                 balance < 0 ? `Owes $${Math.abs(balance).toFixed(2)}` : 'Settled';
+                
+                return `
+                    <div class="member-item fade-in">
+                        <div class="member-avatar">${member.name.charAt(0).toUpperCase()}</div>
+                        <div class="member-info">
+                            <div class="member-name">${member.name}</div>
+                            <div class="member-balance ${balanceClass}">${balanceText}</div>
+                        </div>
+                        <button class="remove-member" onclick="removeMember('${member.id}')">✕</button>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function showAddMemberModal() {
+            document.getElementById('addMemberModal').classList.add('active');
+            document.getElementById('memberName').focus();
+        }
+
+        function handleAddMember(e) {
+            e.preventDefault();
+            const name = document.getElementById('memberName').value.trim();
+            const currentGroup = getCurrentGroup();
+            
+            if (!name || !currentGroup) return;
+
+            // Check if member already exists
+            if (currentGroup.members.some(m => m.name.toLowerCase() === name.toLowerCase())) {
+                showToast('Member already exists!', 'error');
+                return;
+            }
+
+            const newMember = {
+                id: generateId(),
+                name
+            };
+
+            currentGroup.members.push(newMember);
+            saveData();
+
+            renderMembers();
+            updateExpensePayerOptions();
+            renderDashboard();
+
+            closeModal('addMemberModal');
+            document.getElementById('addMemberForm').reset();
+            showToast(`${name} added to the group!`);
+        }
+
+        function removeMember(memberId) {
+            const currentGroup = getCurrentGroup();
+            if (!currentGroup) return;
+
+            const member = currentGroup.members.find(m => m.id === memberId);
+            if (!member) return;
+
+            if (confirm(`Remove ${member.name} from the group?`)) {
+                currentGroup.members = currentGroup.members.filter(m => m.id !== memberId);
+                
+                // Remove member from expenses
+                appState.expenses = appState.expenses.filter(expense => {
+                    if (expense.groupId !== appState.currentGroupId) return true;
+                    return expense.payerId !== memberId && !expense.splits.some(s => s.memberId === memberId);
+                });
+
+                saveData();
+                renderMembers();
+                renderExpenses();
+                renderSettlements();
+                renderDashboard();
+                showToast(`${member.name} removed from the group`);
+            }
+        }
+
+        // Expense Management
+        function renderExpenses() {
+            const expensesList = document.getElementById('expensesList');
+            const currentGroupExpenses = appState.expenses.filter(e => e.groupId === appState.currentGroupId);
+            
+            if (currentGroupExpenses.length === 0) {
+                expensesList.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-icon">💳</div>
+                        <div class="empty-title">No expenses yet</div>
+                        <div class="empty-description">Add your first expense to get started!</div>
+                        <button class="btn" onclick="showAddExpenseModal()">Add Expense</button>
+                    </div>
+                `;
+                return;
+            }
+
+            // Apply current filter
+            const activeFilter = document.querySelector('.filter-btn.active').dataset.filter;
+            let filteredExpenses = [...currentGroupExpenses];
+
+            switch (activeFilter) {
+                case 'recent':
+                    filteredExpenses = filteredExpenses.sort((a, b) => new Date(b.date) - new Date(a.date)).slice(0, 5);
+                    break;
+                case 'highest':
+                    filteredExpenses = filteredExpenses.sort((a, b) => b.amount - a.amount);
+                    break;
+                default:
+                    filteredExpenses = filteredExpenses.sort((a, b) => new Date(b.date) - new Date(a.date));
+            }
+
+            const currentGroup = getCurrentGroup();
+            
+            expensesList.innerHTML = filteredExpenses.map(expense => {
+                let payerInfo = '';
+                
+                if (expense.payments && expense.payments.length > 1) {
+                    // Multiple payers
+                    const payers = expense.payments.map(payment => {
+                        const member = currentGroup.members.find(m => m.id === payment.memberId);
+                        return `${member?.name || 'Unknown'} ($${payment.amount.toFixed(2)})`;
+                    });
+                    payerInfo = `Paid by ${payers.join(', ')}`;
+                } else if (expense.payments && expense.payments.length === 1) {
+                    // Single payer (new format)
+                    const member = currentGroup.members.find(m => m.id === expense.payments[0].memberId);
+                    payerInfo = `Paid by ${member?.name || 'Unknown'}`;
+                } else if (expense.payerId) {
+                    // Legacy single payer format
+                    const payer = currentGroup.members.find(m => m.id === expense.payerId);
+                    payerInfo = `Paid by ${payer?.name || 'Unknown'}`;
+                } else {
+                    payerInfo = 'Paid by Unknown';
+                }
+                
+                return `
+                    <div class="expense-item fade-in">
+                        <div class="expense-header">
+                            <div>
+                                <div class="expense-title">${expense.title}</div>
+                                <div class="expense-meta">
+                                    <span>${payerInfo}</span>
+                                    <span>${new Date(expense.date).toLocaleDateString()}</span>
+                                </div>
+                            </div>
+                            <div class="expense-amount">$${expense.amount.toFixed(2)}</div>
+                        </div>
+                        <div class="expense-actions">
+                            <button class="action-btn" onclick="editExpense('${expense.id}')">✏️</button>
+                            <button class="action-btn danger" onclick="deleteExpense('${expense.id}')">🗑️</button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function showAddExpenseModal() {
+            const currentGroup = getCurrentGroup();
+            if (!currentGroup || currentGroup.members.length === 0) {
+                showToast('Add members to the group first!', 'error');
+                return;
+            }
+
+            appState.editingExpenseId = null;
+            document.getElementById('expenseModalTitle').textContent = 'Add Expense';
+            document.getElementById('expenseForm').reset();
+            document.getElementById('expenseDate').value = new Date().toISOString().split('T')[0];
+            
+            updateExpensePayerOptions();
+            updatePaymentMethod();
+            updateSplitDetails();
+            
+            document.getElementById('expenseModal').classList.add('active');
+            document.getElementById('expenseTitle').focus();
+        }
+
+        function editExpense(expenseId) {
+            const expense = appState.expenses.find(e => e.id === expenseId);
+            if (!expense) return;
+
+            appState.editingExpenseId = expenseId;
+            document.getElementById('expenseModalTitle').textContent = 'Edit Expense';
+            
+            // Populate form
+            document.getElementById('expenseTitle').value = expense.title;
+            document.getElementById('expenseAmount').value = expense.amount;
+            document.getElementById('expensePayer').value = expense.payerId;
+            document.getElementById('expenseDate').value = expense.date;
+            
+            // Set split method
+            document.querySelectorAll('.split-option').forEach(btn => btn.classList.remove('active'));
+            document.querySelector(`[data-split="${expense.splitMethod}"]`).classList.add('active');
+            
+            updateExpensePayerOptions();
+            updateSplitDetails();
+            
+            // Populate split details
+            setTimeout(() => {
+                expense.splits.forEach(split => {
+                    const input = document.querySelector(`[data-member-id="${split.memberId}"]`);
+                    if (input) {
+                        input.value = expense.splitMethod === 'percentage' ? split.percentage : split.amount;
+                    }
+                });
+            }, 100);
+            
+            document.getElementById('expenseModal').classList.add('active');
+        }
+
+        function deleteExpense(expenseId) {
+            const expense = appState.expenses.find(e => e.id === expenseId);
+            if (!expense) return;
+
+            if (confirm(`Delete expense "${expense.title}"?`)) {
+                appState.expenses = appState.expenses.filter(e => e.id !== expenseId);
+                saveData();
+                renderExpenses();
+                renderSettlements();
+                renderDashboard();
+                showToast('Expense deleted successfully');
+            }
+        }
+
+        function handleExpenseSubmit(e) {
+            e.preventDefault();
+            
+            const title = document.getElementById('expenseTitle').value.trim();
+            const amount = parseFloat(document.getElementById('expenseAmount').value);
+            const date = document.getElementById('expenseDate').value;
+            const paymentMethod = document.querySelector('[data-payment].active').dataset.payment;
+            const splitMethod = document.querySelector('[data-split].active').dataset.split;
+            
+            if (!title || !amount || !date) {
+                showToast('Please fill in all required fields', 'error');
+                return;
+            }
+
+            // Collect payment data
+            let payments = [];
+            if (paymentMethod === 'single') {
+                const payerId = document.getElementById('expensePayer').value;
+                if (!payerId) {
+                    showToast('Please select who paid for this expense', 'error');
+                    return;
+                }
+                payments = [{ memberId: payerId, amount: amount }];
+            } else {
+                // Multiple payers
+                const paymentInputs = document.querySelectorAll('.payment-input');
+                let totalPaid = 0;
+                
+                paymentInputs.forEach(input => {
+                    const paidAmount = parseFloat(input.value) || 0;
+                    if (paidAmount > 0) {
+                        payments.push({
+                            memberId: input.dataset.memberId,
+                            amount: paidAmount
+                        });
+                        totalPaid += paidAmount;
+                    }
+                });
+                
+                if (payments.length === 0) {
+                    showToast('Please specify who paid for this expense', 'error');
+                    return;
+                }
+                
+                if (Math.abs(totalPaid - amount) > 0.01) {
+                    showToast('Payment amounts must add up to total expense amount', 'error');
+                    return;
+                }
+            }
+
+            // Collect split data
+            const splits = collectSplitData(splitMethod, amount);
+            if (!splits) return;
+
+            const expenseData = {
+                id: appState.editingExpenseId || generateId(),
+                groupId: appState.currentGroupId,
+                title,
+                amount,
+                paymentMethod,
+                payments,
+                // Keep payerId for backward compatibility with single payer
+                payerId: paymentMethod === 'single' ? payments[0].memberId : null,
+                date,
+                splitMethod,
+                splits,
+                createdAt: appState.editingExpenseId ? 
+                    appState.expenses.find(e => e.id === appState.editingExpenseId).createdAt : 
+                    new Date().toISOString()
+            };
+
+            if (appState.editingExpenseId) {
+                const index = appState.expenses.findIndex(e => e.id === appState.editingExpenseId);
+                appState.expenses[index] = expenseData;
+                showToast('Expense updated successfully!');
+            } else {
+                appState.expenses.push(expenseData);
+                showToast('Expense added successfully!');
+            }
+
+            saveData();
+            renderExpenses();
+            renderSettlements();
+            renderDashboard();
+            closeModal('expenseModal');
+        }
+
+        function collectSplitData(splitMethod, totalAmount) {
+            const currentGroup = getCurrentGroup();
+            const splits = [];
+            
+            if (splitMethod === 'equal') {
+                const amountPerPerson = totalAmount / currentGroup.members.length;
+                currentGroup.members.forEach(member => {
+                    splits.push({
+                        memberId: member.id,
+                        amount: amountPerPerson,
+                        percentage: 100 / currentGroup.members.length
+                    });
+                });
+            } else {
+                let totalPercentage = 0;
+                let totalSplitAmount = 0;
+                
+                currentGroup.members.forEach(member => {
+                    const input = document.querySelector(`[data-member-id="${member.id}"]`);
+                    const value = parseFloat(input.value) || 0;
+                    
+                    if (splitMethod === 'percentage') {
+                        totalPercentage += value;
+                        splits.push({
+                            memberId: member.id,
+                            percentage: value,
+                            amount: (value / 100) * totalAmount
+                        });
+                    } else {
+                        totalSplitAmount += value;
+                        splits.push({
+                            memberId: member.id,
+                            amount: value,
+                            percentage: (value / totalAmount) * 100
+                        });
+                    }
+                });
+                
+                // Validate splits
+                if (splitMethod === 'percentage' && Math.abs(totalPercentage - 100) > 0.01) {
+                    showToast('Percentages must add up to 100%', 'error');
+                    return null;
+                }
+                
+                if (splitMethod === 'exact' && Math.abs(totalSplitAmount - totalAmount) > 0.01) {
+                    showToast('Split amounts must add up to total amount', 'error');
+                    return null;
+                }
+            }
+            
+            return splits;
+        }
+
+        function updateExpensePayerOptions() {
+            const payerSelect = document.getElementById('expensePayer');
+            const currentGroup = getCurrentGroup();
+            
+            payerSelect.innerHTML = currentGroup.members.map(member => 
+                `<option value="${member.id}">${member.name}</option>`
+            ).join('');
+        }
+
+        function updatePaymentMethod() {
+            const paymentMethod = document.querySelector('[data-payment].active').dataset.payment;
+            const singlePayerSection = document.getElementById('singlePayerSection');
+            const multiplePayersSection = document.getElementById('multiplePayersSection');
+            
+            if (paymentMethod === 'single') {
+                singlePayerSection.style.display = 'block';
+                multiplePayersSection.style.display = 'none';
+                document.getElementById('expensePayer').required = true;
+            } else {
+                singlePayerSection.style.display = 'none';
+                multiplePayersSection.style.display = 'block';
+                document.getElementById('expensePayer').required = false;
+                updatePaymentBreakdown();
+            }
+        }
+
+        function updatePaymentBreakdown() {
+            const paymentBreakdown = document.getElementById('paymentBreakdown');
+            const currentGroup = getCurrentGroup();
+            
+            paymentBreakdown.innerHTML = currentGroup.members.map(member => `
+                <div class="member-split">
+                    <div class="member-split-name">${member.name}</div>
+                    <input type="number" 
+                           class="member-split-input payment-input" 
+                           data-member-id="${member.id}"
+                           placeholder="0.00"
+                           step="0.01"
+                           min="0"
+                           onchange="validatePaymentBreakdown()">
+                    <span style="font-size: 0.875rem; color: var(--text-secondary);">$</span>
+                </div>
+            `).join('');
+        }
+
+        function validatePaymentBreakdown() {
+            const totalAmount = parseFloat(document.getElementById('expenseAmount').value) || 0;
+            const paymentInputs = document.querySelectorAll('.payment-input');
+            const validationDiv = document.getElementById('paymentValidation');
+            
+            let totalPaid = 0;
+            paymentInputs.forEach(input => {
+                totalPaid += parseFloat(input.value) || 0;
+            });
+            
+            const difference = totalAmount - totalPaid;
+            
+            if (Math.abs(difference) < 0.01) {
+                validationDiv.innerHTML = '<span style="color: var(--secondary-color);">✅ Payments match total amount</span>';
+                validationDiv.style.color = 'var(--secondary-color)';
+            } else if (difference > 0) {
+                validationDiv.innerHTML = `<span style="color: var(--warning-color);">⚠️ Missing $${difference.toFixed(2)}</span>`;
+                validationDiv.style.color = 'var(--warning-color)';
+            } else {
+                validationDiv.innerHTML = `<span style="color: var(--danger-color);">❌ Overpaid by $${Math.abs(difference).toFixed(2)}</span>`;
+                validationDiv.style.color = 'var(--danger-color)';
+            }
+        }
+
+        function handleSplitOptionChange(e) {
+            // Only handle split method buttons, not payment method buttons
+            if (e.target.dataset.split) {
+                document.querySelectorAll('[data-split]').forEach(btn => btn.classList.remove('active'));
+                e.target.classList.add('active');
+                updateSplitDetails();
+            }
+        }
+
+        function handlePaymentMethodChange(e) {
+            // Only handle payment method buttons
+            if (e.target.dataset.payment) {
+                document.querySelectorAll('[data-payment]').forEach(btn => btn.classList.remove('active'));
+                e.target.classList.add('active');
+                updatePaymentMethod();
+            }
+        }
+
+        function updateSplitDetails() {
+            const splitMethod = document.querySelector('.split-option.active').dataset.split;
+            const splitDetails = document.getElementById('splitDetails');
+            const currentGroup = getCurrentGroup();
+            
+            if (splitMethod === 'equal') {
+                splitDetails.classList.remove('active');
+                return;
+            }
+            
+            splitDetails.classList.add('active');
+            
+            const inputType = splitMethod === 'percentage' ? 'number' : 'number';
+            const placeholder = splitMethod === 'percentage' ? '0' : '0.00';
+            const step = splitMethod === 'percentage' ? '1' : '0.01';
+            
+            splitDetails.innerHTML = `
+                <h4 style="margin-bottom: 1rem; color: var(--text-primary);">
+                    ${splitMethod === 'percentage' ? 'Percentage Split' : 'Exact Amount Split'}
+                </h4>
+                ${currentGroup.members.map(member => `
+                    <div class="member-split">
+                        <div class="member-split-name">${member.name}</div>
+                        <input type="${inputType}" 
+                               class="member-split-input" 
+                               data-member-id="${member.id}"
+                               placeholder="${placeholder}"
+                               step="${step}"
+                               min="0"
+                               ${splitMethod === 'percentage' ? 'max="100"' : ''}>
+                        <span style="font-size: 0.875rem; color: var(--text-secondary);">
+                            ${splitMethod === 'percentage' ? '%' : '$'}
+                        </span>
+                    </div>
+                `).join('')}
+            `;
+        }
+
+        function handleExpenseFilter(e) {
+            document.querySelectorAll('.filter-btn').forEach(btn => btn.classList.remove('active'));
+            e.target.classList.add('active');
+            renderExpenses();
+        }
+
+        // Settlement Calculations
+        function calculateBalances() {
+            const currentGroup = getCurrentGroup();
+            if (!currentGroup) return {};
+            
+            const balances = {};
+            const totalPaid = {};
+            const totalOwed = {};
+            
+            // Initialize tracking objects
+            currentGroup.members.forEach(member => {
+                balances[member.id] = 0;
+                totalPaid[member.id] = 0;
+                totalOwed[member.id] = 0;
+            });
+            
+            const groupExpenses = appState.expenses.filter(e => e.groupId === appState.currentGroupId);
+            
+            groupExpenses.forEach(expense => {
+                // Track how much each person paid
+                if (expense.payments) {
+                    // New format with multiple payers support
+                    expense.payments.forEach(payment => {
+                        totalPaid[payment.memberId] += payment.amount;
+                    });
+                } else if (expense.payerId) {
+                    // Legacy format with single payer
+                    totalPaid[expense.payerId] += expense.amount;
+                }
+                
+                // Track how much each person owes (their share of expenses)
+                expense.splits.forEach(split => {
+                    totalOwed[split.memberId] += split.amount;
+                });
+            });
+            
+            // Calculate net balance: what they paid minus what they owe
+            currentGroup.members.forEach(member => {
+                balances[member.id] = totalPaid[member.id] - totalOwed[member.id];
+            });
+            
+            // Store additional info for detailed display
+            balances._details = {
+                totalPaid,
+                totalOwed,
+                totalExpenses: groupExpenses.reduce((sum, exp) => sum + exp.amount, 0),
+                averagePerPerson: groupExpenses.reduce((sum, exp) => sum + exp.amount, 0) / Math.max(currentGroup.members.length, 1)
+            };
+            
+            return balances;
+        }
+
+        function optimizeSettlements(balances) {
+            const currentGroup = getCurrentGroup();
+            if (!currentGroup) return [];
+            
+            // Create detailed settlement breakdown
+            const settlements = [];
+            const memberBalances = { ...balances };
+            
+            // Find who owes money (negative balance) and who is owed money (positive balance)
+            const debtors = [];
+            const creditors = [];
+            
+            Object.entries(memberBalances).forEach(([memberId, balance]) => {
+                const member = currentGroup.members.find(m => m.id === memberId);
+                if (!member) return;
+                
+                if (balance < -0.01) {
+                    debtors.push({ 
+                        memberId, 
+                        name: member.name,
+                        amount: Math.abs(balance) 
+                    });
+                } else if (balance > 0.01) {
+                    creditors.push({ 
+                        memberId, 
+                        name: member.name,
+                        amount: balance 
+                    });
+                }
+            });
+            
+            // Create settlements using greedy algorithm to minimize transactions
+            const debtorsCopy = [...debtors];
+            const creditorsCopy = [...creditors];
+            
+            while (debtorsCopy.length > 0 && creditorsCopy.length > 0) {
+                const debtor = debtorsCopy[0];
+                const creditor = creditorsCopy[0];
+                
+                const settlementAmount = Math.min(debtor.amount, creditor.amount);
+                
+                if (settlementAmount > 0.01) {
+                    settlements.push({
+                        from: debtor.memberId,
+                        fromName: debtor.name,
+                        to: creditor.memberId,
+                        toName: creditor.name,
+                        amount: settlementAmount
+                    });
+                }
+                
+                debtor.amount -= settlementAmount;
+                creditor.amount -= settlementAmount;
+                
+                if (debtor.amount < 0.01) {
+                    debtorsCopy.shift();
+                }
+                if (creditor.amount < 0.01) {
+                    creditorsCopy.shift();
+                }
+            }
+            
+            return settlements;
+        }
+
+        function renderSettlements() {
+            const settlementList = document.getElementById('settlementList');
+            const balances = calculateBalances();
+            const settlements = optimizeSettlements(balances);
+            const currentGroup = getCurrentGroup();
+            
+            if (settlements.length === 0) {
+                settlementList.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-icon">✅</div>
+                        <div class="empty-title">All settled!</div>
+                        <div class="empty-description">No outstanding balances</div>
+                    </div>
+                `;
+                return;
+            }
+            
+            // Show detailed breakdown first
+            let settlementHTML = `
+                <div style="margin-bottom: 1.5rem; padding: 1rem; background: var(--surface-color); border-radius: 0.75rem; border: 1px solid var(--border-color);">
+                    <h4 style="margin-bottom: 1rem; color: var(--text-primary); font-weight: 600;">💡 How it works:</h4>
+                    <p style="font-size: 0.875rem; color: var(--text-secondary); line-height: 1.5;">
+                        Each person's fair share is calculated based on total expenses divided by number of members. 
+                        Those who paid less than their share owe money to those who paid more.
+                    </p>
+                </div>
+            `;
+            
+            // Show detailed breakdown
+            const details = balances._details;
+            if (details && details.totalExpenses > 0) {
+                settlementHTML += `
+                    <div style="margin-bottom: 1.5rem; padding: 1rem; background: var(--card-color); border-radius: 0.75rem; border: 1px solid var(--border-color);">
+                        <h4 style="margin-bottom: 1rem; color: var(--text-primary); font-weight: 600;">📊 Expense Breakdown:</h4>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem; font-size: 0.875rem;">
+                            <div style="text-align: center; padding: 0.75rem; background: var(--surface-color); border-radius: 0.5rem;">
+                                <div style="font-weight: 600; color: var(--primary-color);">$${details.totalExpenses.toFixed(2)}</div>
+                                <div style="color: var(--text-secondary);">Total Expenses</div>
+                            </div>
+                            <div style="text-align: center; padding: 0.75rem; background: var(--surface-color); border-radius: 0.5rem;">
+                                <div style="font-weight: 600; color: var(--secondary-color);">$${details.averagePerPerson.toFixed(2)}</div>
+                                <div style="color: var(--text-secondary);">Per Person</div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+            
+            // Show individual balances with detailed breakdown
+            settlementHTML += `
+                <div style="margin-bottom: 1.5rem;">
+                    <h4 style="margin-bottom: 1rem; color: var(--text-primary); font-weight: 600;">👥 Individual Breakdown:</h4>
+                    ${Object.entries(balances).filter(([key]) => key !== '_details').map(([memberId, balance]) => {
+                        const member = currentGroup.members.find(m => m.id === memberId);
+                        if (!member) return '';
+                        
+                        const paid = details ? details.totalPaid[memberId] || 0 : 0;
+                        const owes = details ? details.totalOwed[memberId] || 0 : 0;
+                        
+                        const balanceClass = balance > 0 ? 'positive' : balance < 0 ? 'negative' : '';
+                        const balanceText = balance > 0 ? `Should receive $${Math.abs(balance).toFixed(2)}` : 
+                                         balance < 0 ? `Should pay $${Math.abs(balance).toFixed(2)}` : 'All settled';
+                        const icon = balance > 0 ? '💰' : balance < 0 ? '💸' : '✅';
+                        
+                        return `
+                            <div style="padding: 1rem; background: var(--card-color); border-radius: 0.75rem; margin-bottom: 0.75rem; border: 1px solid var(--border-color);">
+                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
+                                    <span style="display: flex; align-items: center; gap: 0.75rem;">
+                                        <div class="member-avatar" style="width: 2.5rem; height: 2.5rem; font-size: 1rem;">${member.name.charAt(0).toUpperCase()}</div>
+                                        <strong style="font-size: 1.1rem;">${member.name}</strong>
+                                    </span>
+                                    <span class="member-balance ${balanceClass}" style="font-weight: 700; font-size: 1.1rem;">
+                                        ${balanceText}
+                                    </span>
+                                </div>
+                                <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0.75rem; font-size: 0.875rem;">
+                                    <div style="text-align: center; padding: 0.5rem; background: var(--surface-color); border-radius: 0.5rem;">
+                                        <div style="font-weight: 600; color: var(--primary-color);">$${paid.toFixed(2)}</div>
+                                        <div style="color: var(--text-secondary);">Paid</div>
+                                    </div>
+                                    <div style="text-align: center; padding: 0.5rem; background: var(--surface-color); border-radius: 0.5rem;">
+                                        <div style="font-weight: 600; color: var(--accent-color);">$${owes.toFixed(2)}</div>
+                                        <div style="color: var(--text-secondary);">Fair Share</div>
+                                    </div>
+                                    <div style="text-align: center; padding: 0.5rem; background: var(--surface-color); border-radius: 0.5rem;">
+                                        <div style="font-weight: 600; color: ${balance >= 0 ? 'var(--secondary-color)' : 'var(--danger-color)'};">
+                                            ${balance >= 0 ? '+' : ''}$${balance.toFixed(2)}
+                                        </div>
+                                        <div style="color: var(--text-secondary);">Balance</div>
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                    }).join('')}
+                </div>
+            `;
+            
+            // Show optimized settlements
+            settlementHTML += `
+                <div>
+                    <h4 style="margin-bottom: 1rem; color: var(--text-primary); font-weight: 600;">🔄 Optimized Settlements:</h4>
+                    <p style="font-size: 0.875rem; color: var(--text-secondary); margin-bottom: 1rem;">
+                        Minimum ${settlements.length} transaction${settlements.length !== 1 ? 's' : ''} needed to settle all balances:
+                    </p>
+                    ${settlements.map((settlement, index) => `
+                        <div class="settlement-item slide-in" style="animation-delay: ${index * 0.1}s;">
+                            <div class="settlement-text">
+                                <strong>${settlement.fromName}</strong> pays <strong>${settlement.toName}</strong>
+                            </div>
+                            <div class="settlement-arrow">→</div>
+                            <div class="settlement-amount">$${settlement.amount.toFixed(2)}</div>
+                        </div>
+                    `).join('')}
+                </div>
+            `;
+            
+            settlementList.innerHTML = settlementHTML;
+        }
+
+        // Dashboard
+        function renderDashboard() {
+            const currentGroup = getCurrentGroup();
+            const groupExpenses = appState.expenses.filter(e => e.groupId === appState.currentGroupId);
+            
+            // Update stats
+            const totalExpenses = groupExpenses.reduce((sum, expense) => sum + expense.amount, 0);
+            const totalMembers = currentGroup ? currentGroup.members.length : 0;
+            
+            document.getElementById('totalExpenses').textContent = `$${totalExpenses.toFixed(2)}`;
+            document.getElementById('totalMembers').textContent = totalMembers;
+            
+            // Update chart
+            updateExpenseChart();
+        }
+
+        function updateExpenseChart() {
+            const ctx = document.getElementById('expenseChart').getContext('2d');
+            const currentGroup = getCurrentGroup();
+            const groupExpenses = appState.expenses.filter(e => e.groupId === appState.currentGroupId);
+            
+            if (expenseChart) {
+                expenseChart.destroy();
+            }
+            
+            if (!currentGroup || groupExpenses.length === 0) {
+                expenseChart = new Chart(ctx, {
+                    type: 'doughnut',
+                    data: {
+                        labels: ['No Data'],
+                        datasets: [{
+                            data: [1],
+                            backgroundColor: ['#e5e7eb'],
+                            borderWidth: 0
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                display: false
+                            }
+                        }
+                    }
+                });
+                return;
+            }
+            
+            // Calculate spending by member
+            const spendingByMember = {};
+            currentGroup.members.forEach(member => {
+                spendingByMember[member.id] = 0;
+            });
+            
+            groupExpenses.forEach(expense => {
+                if (expense.payments) {
+                    // New format with multiple payers support
+                    expense.payments.forEach(payment => {
+                        spendingByMember[payment.memberId] += payment.amount;
+                    });
+                } else if (expense.payerId) {
+                    // Legacy format with single payer
+                    spendingByMember[expense.payerId] += expense.amount;
+                }
+            });
+            
+            const labels = [];
+            const data = [];
+            const colors = ['#6366f1', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#84cc16', '#f97316'];
+            
+            Object.entries(spendingByMember).forEach(([memberId, amount], index) => {
+                if (amount > 0) {
+                    const member = currentGroup.members.find(m => m.id === memberId);
+                    labels.push(member?.name || 'Unknown');
+                    data.push(amount);
+                }
+            });
+            
+            expenseChart = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels,
+                    datasets: [{
+                        data,
+                        backgroundColor: colors.slice(0, data.length),
+                        borderWidth: 2,
+                        borderColor: getComputedStyle(document.documentElement).getPropertyValue('--card-color')
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                            labels: {
+                                padding: 20,
+                                usePointStyle: true,
+                                color: getComputedStyle(document.documentElement).getPropertyValue('--text-primary')
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        // Modal Management
+        function closeModal(modalId) {
+            document.getElementById(modalId).classList.remove('active');
+        }
+
+        // Theme Management
+        function toggleTheme() {
+            const currentTheme = document.documentElement.getAttribute('data-theme');
+            const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+            
+            document.documentElement.setAttribute('data-theme', newTheme);
+            document.getElementById('themeToggle').textContent = newTheme === 'dark' ? '☀️' : '🌙';
+            
+            localStorage.setItem('billSplitterTheme', newTheme);
+            
+            // Update chart colors
+            setTimeout(updateExpenseChart, 100);
+        }
+
+        function loadTheme() {
+            const savedTheme = localStorage.getItem('billSplitterTheme') || 'light';
+            document.documentElement.setAttribute('data-theme', savedTheme);
+            document.getElementById('themeToggle').textContent = savedTheme === 'dark' ? '☀️' : '🌙';
+        }
+
+        // Export/Import Functions
+        function exportData() {
+            const exportData = {
+                groups: appState.groups,
+                expenses: appState.expenses,
+                exportDate: new Date().toISOString(),
+                version: '1.0'
+            };
+            
+            const dataStr = JSON.stringify(exportData, null, 2);
+            const dataBlob = new Blob([dataStr], { type: 'application/json' });
+            
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(dataBlob);
+            link.download = `bill-splitter-export-${new Date().toISOString().split('T')[0]}.json`;
+            link.click();
+            
+            showToast('Data exported successfully!');
+        }
+
+        function importData(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const importedData = JSON.parse(e.target.result);
+                    
+                    if (!importedData.groups || !importedData.expenses) {
+                        throw new Error('Invalid file format');
+                    }
+                    
+                    if (confirm('This will replace all current data. Continue?')) {
+                        appState.groups = importedData.groups;
+                        appState.expenses = importedData.expenses;
+                        appState.currentGroupId = appState.groups.length > 0 ? appState.groups[0].id : null;
+                        
+                        saveData();
+                        
+                        renderGroups();
+                        renderMembers();
+                        renderExpenses();
+                        renderSettlements();
+                        renderDashboard();
+                        
+                        showToast('Data imported successfully!');
+                    }
+                } catch (error) {
+                    showToast('Error importing file. Please check the format.', 'error');
+                }
+            };
+            reader.readAsText(file);
+            
+            // Reset file input
+            event.target.value = '';
+        }
+
+        // PDF Report Generation
+        function generatePDF() {
+            const currentGroup = getCurrentGroup();
+            if (!currentGroup) {
+                showToast('No group selected', 'error');
+                return;
+            }
+
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF();
+            
+            // Title
+            doc.setFontSize(20);
+            doc.text(`${currentGroup.name} - Expense Report`, 20, 30);
+            
+            // Date
+            doc.setFontSize(12);
+            doc.text(`Generated on: ${new Date().toLocaleDateString()}`, 20, 45);
+            
+            let yPosition = 65;
+            
+            // Members section
+            doc.setFontSize(16);
+            doc.text('Members:', 20, yPosition);
+            yPosition += 10;
+            
+            const balances = calculateBalances();
+            doc.setFontSize(12);
+            currentGroup.members.forEach(member => {
+                const balance = balances[member.id] || 0;
+                const balanceText = balance > 0 ? `Gets $${Math.abs(balance).toFixed(2)}` : 
+                                 balance < 0 ? `Owes $${Math.abs(balance).toFixed(2)}` : 'Settled';
+                doc.text(`• ${member.name}: ${balanceText}`, 25, yPosition);
+                yPosition += 8;
+            });
+            
+            yPosition += 10;
+            
+            // Expenses section
+            const groupExpenses = appState.expenses.filter(e => e.groupId === appState.currentGroupId);
+            if (groupExpenses.length > 0) {
+                doc.setFontSize(16);
+                doc.text('Expenses:', 20, yPosition);
+                yPosition += 10;
+                
+                doc.setFontSize(12);
+                groupExpenses.forEach(expense => {
+                    let payerInfo = '';
+                    if (expense.payments) {
+                        const payers = expense.payments.map(payment => {
+                            const member = currentGroup.members.find(m => m.id === payment.memberId);
+                            return `${member?.name || 'Unknown'}: $${payment.amount.toFixed(2)}`;
+                        });
+                        payerInfo = payers.join(', ');
+                    } else if (expense.payerId) {
+                        const payer = currentGroup.members.find(m => m.id === expense.payerId);
+                        payerInfo = payer?.name || 'Unknown';
+                    }
+                    
+                    doc.text(`• ${expense.title}: $${expense.amount.toFixed(2)} (${payerInfo}) - ${new Date(expense.date).toLocaleDateString()}`, 25, yPosition);
+                    yPosition += 8;
+                    
+                    if (yPosition > 270) {
+                        doc.addPage();
+                        yPosition = 30;
+                    }
+                });
+                
+                yPosition += 10;
+            }
+            
+            // Settlements section
+            const settlements = optimizeSettlements(balances);
+            if (settlements.length > 0) {
+                doc.setFontSize(16);
+                doc.text('Settlements:', 20, yPosition);
+                yPosition += 10;
+                
+                doc.setFontSize(12);
+                settlements.forEach(settlement => {
+                    const fromMember = currentGroup.members.find(m => m.id === settlement.from);
+                    const toMember = currentGroup.members.find(m => m.id === settlement.to);
+                    doc.text(`• ${fromMember?.name || 'Unknown'} owes ${toMember?.name || 'Unknown'}: $${settlement.amount.toFixed(2)}`, 25, yPosition);
+                    yPosition += 8;
+                });
+            }
+            
+            // Total
+            const totalExpenses = groupExpenses.reduce((sum, expense) => sum + expense.amount, 0);
+            yPosition += 10;
+            doc.setFontSize(14);
+            doc.text(`Total Expenses: $${totalExpenses.toFixed(2)}`, 20, yPosition);
+            
+            // Save PDF
+            doc.save(`${currentGroup.name.replace(/[^a-z0-9]/gi, '_').toLowerCase()}_expense_report.pdf`);
+            showToast('PDF report generated successfully!');
+        }
+
+        // Initialize the application
+        document.addEventListener('DOMContentLoaded', init);
+    </script>
+<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'97fe963e60258a02',t:'MTc1ODAwNzA3NS4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</html>
