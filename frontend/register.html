@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Create Account — Bill Splitter</title>
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/auth.css">
+  <link rel="stylesheet" href="css/responsive.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body class="auth-body">
+  <div class="auth-container">
+    <div class="auth-card">
+      <div class="auth-header">
+        <div class="auth-logo">⚖️</div>
+        <h1 class="auth-title">Create Account</h1>
+        <p class="auth-subtitle">Register to split expenses with friends & roommates</p>
+      </div>
+
+      <div id="authAlert" class="alert-box"></div>
+
+      <form id="registerForm" class="auth-form">
+        <div class="form-group">
+          <label class="form-label" for="regName">Full Name</label>
+          <input type="text" id="regName" class="form-control" placeholder="e.g. Arun Kumar" required autocomplete="name">
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="regEmail">Email Address</label>
+          <input type="email" id="regEmail" class="form-control" placeholder="name@example.com" required autocomplete="email">
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="regPassword">Password (min 6 characters)</label>
+          <input type="password" id="regPassword" class="form-control" placeholder="••••••••" required minlength="6" autocomplete="new-password">
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="regConfirmPassword">Confirm Password</label>
+          <input type="password" id="regConfirmPassword" class="form-control" placeholder="••••••••" required minlength="6" autocomplete="new-password">
+        </div>
+
+        <button type="submit" id="regSubmitBtn" class="btn btn-primary" style="margin-top: 0.5rem; width: 100%;">
+          Create Account
+        </button>
+      </form>
+
+      <div class="auth-footer">
+        Already have an account? <a href="login.html">Log in</a>
+      </div>
+    </div>
+  </div>
+
+  <div id="toastContainer" class="toast-container"></div>
+
+  <script src="js/api.js"></script>
+  <script src="js/auth.js"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      if (Auth.isAuthenticated()) {
+        window.location.href = 'index.html';
+      }
+
+      const form = document.getElementById('registerForm');
+      form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const name = document.getElementById('regName').value;
+        const email = document.getElementById('regEmail').value;
+        const password = document.getElementById('regPassword').value;
+        const confirmPassword = document.getElementById('regConfirmPassword').value;
+        const btn = document.getElementById('regSubmitBtn');
+        const alertBox = document.getElementById('authAlert');
+
+        if (password !== confirmPassword) {
+          alertBox.textContent = 'Passwords do not match';
+          alertBox.className = 'alert-box error active';
+          return;
+        }
+
+        try {
+          btn.disabled = true;
+          btn.textContent = 'Creating account...';
+          alertBox.className = 'alert-box';
+          alertBox.textContent = '';
+
+          await Auth.register(name, email, password, confirmPassword);
+          window.location.href = 'index.html';
+        } catch (err) {
+          alertBox.textContent = err.message || 'Registration failed';
+          alertBox.className = 'alert-box error active';
+        } finally {
+          btn.disabled = false;
+          btn.textContent = 'Create Account';
+        }
+      });
+    });
+  </script>
+</body>
+</html>
